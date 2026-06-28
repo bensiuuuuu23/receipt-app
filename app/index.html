@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>餐廳記帳</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app">
+
+    <!-- 首頁 -->
+    <section class="screen" data-screen="home">
+      <header class="hd"><div class="hd-title">本月支出</div><div class="hd-sub" id="homeMonthLabel">—</div></header>
+      <div class="content">
+        <div class="card center">
+          <div class="big" id="homeTotal">$0</div>
+          <div class="muted" id="homeCount">共 0 張單據</div>
+        </div>
+        <div class="muted sec-label">最近單據</div>
+        <div id="homeRecent"></div>
+      </div>
+    </section>
+
+    <!-- 單據庫 -->
+    <section class="screen" data-screen="list" hidden>
+      <header class="hd"><div class="hd-title">單據庫</div><div class="hd-sub" id="listCount">—</div></header>
+      <div class="content"><div id="listAll"></div></div>
+    </section>
+
+    <!-- 結算（第 2 步做） -->
+    <section class="screen" data-screen="summary" hidden>
+      <header class="hd"><div class="hd-title">結算</div></header>
+      <div class="content"><div class="card center muted">日 / 月 / 年結將在第 2 步加入。</div></div>
+    </section>
+
+    <!-- 設定（後面做） -->
+    <section class="screen" data-screen="settings" hidden>
+      <header class="hd"><div class="hd-title">設定</div></header>
+      <div class="content">
+        <div class="card muted">Google Sheet 同步、分類管理等將在後續步驟加入。</div>
+        <div class="card">
+          <div class="muted sec-label" style="margin-top:0">資料</div>
+          <button class="btn ghost" id="btnClearAll">清空所有單據（本機）</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 新增 / 編輯單據 -->
+    <section class="screen sheet" data-screen="add" hidden>
+      <header class="hd">
+        <button class="hd-back" id="addCancel">✕</button>
+        <div class="hd-title" id="addTitle">新增單據</div>
+        <div style="width:32px"></div>
+      </header>
+      <div class="content">
+        <div class="seg" id="modeSeg">
+          <div data-mode="scan" class="dim">📷 掃描（第 3 步）</div>
+          <div data-mode="manual" class="on">✎ 手動輸入</div>
+        </div>
+
+        <!-- 金額 -->
+        <div class="amt-row" id="amountRow">
+          <span class="muted">金額</span>
+          <input id="fAmount" class="amt-input" inputmode="decimal" placeholder="0.00">
+        </div>
+
+        <!-- 種類 -->
+        <div class="muted sec-label">種類</div>
+        <div class="cat-grid" id="catGrid"></div>
+
+        <!-- 人工專屬 -->
+        <div id="laborBox" hidden>
+          <div class="card labor-card">
+            <div class="labor-inputs">
+              <label>時薪<input id="fWage" class="mini-input" inputmode="decimal" placeholder="0"></label>
+              <span class="times">×</span>
+              <label>工作小時<input id="fHours" class="mini-input" inputmode="decimal" placeholder="0"></label>
+            </div>
+            <div class="labor-total"><span class="muted">= 工資（自動算）</span><b id="laborTotal">$0.00</b></div>
+          </div>
+          <div class="muted sec-label">員工名稱（記為備註）</div>
+          <input id="fEmployee" class="text-input" placeholder="例：阿強">
+        </div>
+
+        <!-- 供應商 -->
+        <div id="supplierBox">
+          <div class="muted sec-label">供應商名稱</div>
+          <input id="fSupplier" class="text-input" list="supplierList" placeholder="例：美心蔬果行" autocomplete="off">
+          <datalist id="supplierList"></datalist>
+          <div class="muted hint" id="supplierHint"></div>
+        </div>
+
+        <!-- 日期 + 備註 -->
+        <div class="muted sec-label">日期</div>
+        <input id="fDate" class="text-input" type="date">
+        <div class="muted sec-label">備註（選填）</div>
+        <input id="fNote" class="text-input" placeholder="補充說明">
+
+        <button class="btn" id="btnSave">✓ 儲存</button>
+        <button class="btn danger ghost" id="btnDelete" hidden>🗑 刪除這張</button>
+      </div>
+    </section>
+
+    <!-- 底部分頁 -->
+    <nav class="tabbar">
+      <div class="tab on" data-go="home"><i>🏠</i>首頁</div>
+      <div class="tab" data-go="list"><i>📋</i>單據</div>
+      <div class="tab" data-go="summary"><i>📊</i>結算</div>
+      <div class="tab" data-go="settings"><i>⚙️</i>設定</div>
+    </nav>
+    <button class="fab" id="fab">＋</button>
+
+  </div>
+
+  <script src="db.js"></script>
+  <script src="classify.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>餐廳記帳 App — 設計預覽</title>
+<meta http-equiv="refresh" content="2">
+<style>
+  :root{
+    --bg:#0f1115; --card:#1a1d24; --ink:#e8eaed; --sub:#9aa0aa;
+    --accent:#3ddc84; --accent2:#ffb648; --line:#2a2e37; --danger:#ff6b6b;
+  }
+  *{box-sizing:border-box;font-family:-apple-system,"PingFang TC","Noto Sans CJK TC",sans-serif}
+  body{margin:0;background:#0b0d11;color:var(--ink);padding:24px}
+  h1{font-size:20px;margin:0 0 4px}
+  .tag{color:var(--sub);font-size:13px;margin-bottom:20px}
+  .rail{display:flex;gap:22px;overflow-x:auto;padding-bottom:18px}
+  .col{flex:0 0 auto;width:300px}
+  .cap{font-size:13px;color:var(--accent);margin:10px 2px 0;font-weight:700}
+  .cap small{color:var(--sub);font-weight:400;display:block;margin-top:2px}
+  .phone{width:300px;height:620px;background:#000;border-radius:38px;padding:11px;
+    box-shadow:0 18px 50px rgba(0,0,0,.5)}
+  .screen{width:100%;height:100%;background:var(--bg);border-radius:28px;overflow:hidden;
+    display:flex;flex-direction:column;position:relative}
+  .sb{height:30px;display:flex;align-items:center;justify-content:center;color:var(--sub);font-size:11px;flex:0 0 auto}
+  .body{flex:1;overflow:hidden;padding:0 14px}
+  .title{font-size:18px;font-weight:800;padding:6px 2px 2px}
+  .muted{color:var(--sub);font-size:12px}
+  .tabbar{flex:0 0 auto;height:58px;border-top:1px solid var(--line);display:flex;background:#13161c}
+  .tabbar div{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:3px;font-size:10px;color:var(--sub)}
+  .tabbar .on{color:var(--accent)}
+  .tabbar i{font-size:18px;font-style:normal}
+  .big{font-size:30px;font-weight:800;letter-spacing:.5px}
+  .pill{display:inline-block;background:#222732;border:1px solid var(--line);border-radius:999px;
+    padding:4px 11px;font-size:12px;margin:2px 4px 2px 0;color:var(--sub)}
+  .pill.on{background:rgba(61,220,132,.15);border-color:var(--accent);color:var(--accent)}
+  .rowitem{display:flex;align-items:center;gap:10px;padding:10px 8px;border-bottom:1px solid var(--line)}
+  .dot{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:17px}
+  .grow{flex:1;min-width:0}
+  .grow .n{font-size:14px;font-weight:600}
+  .grow .s{font-size:11px;color:var(--sub)}
+  .amt{font-size:15px;font-weight:700}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;margin:10px 0}
+  .field{background:#13161c;border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:8px 0}
+  .field .lab{font-size:11px;color:var(--sub)}
+  .field .val{font-size:16px;font-weight:600;margin-top:3px}
+  .field.edit{border-color:var(--accent)}
+  .scanbox{margin:10px 0;height:150px;border:2px dashed var(--line);border-radius:16px;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--sub);gap:6px;background:#101319}
+  .btn{background:var(--accent);color:#06210f;font-weight:800;text-align:center;border-radius:14px;padding:13px;margin-top:8px}
+  .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--ink);font-weight:600}
+  .fab{position:absolute;right:16px;bottom:74px;width:56px;height:56px;border-radius:50%;
+    background:var(--accent);color:#06210f;display:flex;align-items:center;justify-content:center;
+    font-size:28px;font-weight:700;box-shadow:0 8px 20px rgba(61,220,132,.4)}
+  .seg{display:flex;background:#13161c;border:1px solid var(--line);border-radius:12px;padding:3px;margin:8px 0}
+  .seg div{flex:1;text-align:center;font-size:13px;padding:7px;border-radius:9px;color:var(--sub)}
+  .seg .on{background:var(--accent);color:#06210f;font-weight:700}
+  .bar{display:flex;align-items:center;gap:8px;margin:9px 0;font-size:12px}
+  .bar .track{flex:1;height:8px;background:#222732;border-radius:99px;overflow:hidden}
+  .bar .fill{height:100%;border-radius:99px}
+  .note{width:340px;flex:0 0 auto;line-height:1.7;font-size:14px;color:var(--ink)}
+  .note h2{font-size:15px;color:var(--accent2);margin:18px 0 6px}
+  .note ul{padding-left:18px;margin:6px 0}
+  .note li{margin:4px 0}
+  .key{background:#1a1d24;border:1px solid var(--line);border-radius:11px;
+    text-align:center;padding:13px 0;font-size:20px;font-weight:600}
+  .key.sm{padding:8px 0;font-size:16px;border-radius:9px}
+  .catmini{background:#13161c;border:1px solid var(--line);border-radius:10px;
+    text-align:center;padding:9px 0;font-size:13px;color:var(--sub)}
+  .catmini.on{background:rgba(61,220,132,.15);border-color:var(--accent);color:var(--accent);font-weight:700}
+</style>
+</head>
+<body>
+  <h1>餐廳記帳 App — 設計預覽（第一版，先不接 AI）</h1>
+  <div class="tag">每 2 秒自動刷新；左右捲動看所有畫面 →</div>
+
+  <div class="rail">
+
+    <!-- 1 首頁 -->
+    <div class="col">
+      <div class="phone"><div class="screen">
+        <div class="sb">9:41　　●●●　📶 🔋</div>
+        <div class="body">
+          <div class="title">本月支出</div>
+          <div class="muted">2026 年 6 月</div>
+          <div class="card" style="text-align:center">
+            <div class="big" style="color:var(--accent)">$128,450</div>
+            <div class="muted" style="margin-top:4px">共 86 張單據 · 較上月 ▲ 6%</div>
+          </div>
+          <div class="muted" style="margin:6px 2px">最近單據</div>
+          <div class="rowitem"><div class="dot" style="background:rgba(61,220,132,.15)">🥬</div>
+            <div class="grow"><div class="n">美心蔬果行</div><div class="s">食材入貨 · 今天 08:30</div></div>
+            <div class="amt">$3,280</div></div>
+          <div class="rowitem"><div class="dot" style="background:rgba(90,169,255,.15)">🍶</div>
+            <div class="grow"><div class="n">可口可樂代理</div><div class="s">飲料酒水 · 昨天</div></div>
+            <div class="amt">$1,560</div></div>
+          <div class="rowitem"><div class="dot" style="background:rgba(255,143,163,.15)">💡</div>
+            <div class="grow"><div class="n">中華電力</div><div class="s">水電煤 · 6/24</div></div>
+            <div class="amt">$8,900</div></div>
+        </div>
+        <div class="fab">＋</div>
+        <div class="tabbar">
+          <div class="on"><i>🏠</i>首頁</div><div><i>📋</i>單據</div>
+          <div><i>📊</i>結算</div><div><i>⚙️</i>設定</div>
+        </div>
+      </div></div>
+      <div class="cap">① 首頁<small>一眼看本月花多少、最近幾張單，右下＋新增</small></div>
+    </div>
+
+    <!-- 2 掃描 -->
+    <div class="col">
+      <div class="phone"><div class="screen">
+        <div class="sb">9:41　　●●●　📶 🔋</div>
+        <div class="body">
+          <div class="title">新增單據</div>
+          <div class="seg"><div class="on">📷 掃描單據</div><div>✎ 手動輸入</div></div>
+          <div class="scanbox">📷<div style="font-size:13px">把單據放進框內<br>自動辨識金額與日期</div></div>
+          <div class="muted">辨識中… 已讀到金額、日期、店名</div>
+          <div class="btn ghost">📁 從相簿選一批單據</div>
+          <div class="card" style="margin-top:14px">
+            <div class="muted">💡 可一次連拍多張，逐張快速核對</div>
+          </div>
+        </div>
+        <div class="tabbar">
+          <div><i>🏠</i>首頁</div><div class="on"><i>📋</i>單據</div>
+          <div><i>📊</i>結算</div><div><i>⚙️</i>設定</div>
+        </div>
+      </div></div>
+      <div class="cap">② 掃描 / 手動<small>拍照自動讀數，或切去手動打；可一次連拍多張</small></div>
+    </div>
+
+    <!-- 2b 手動輸入 -->
+    <div class="col">
+      <div class="phone"><div class="screen">
+        <div class="sb">9:41　　●●●　📶 🔋</div>
+        <div class="body" style="padding:0 14px;display:flex;flex-direction:column;overflow:auto">
+          <div class="title">新增單據</div>
+          <div class="seg"><div>📷 掃描單據</div><div class="on">✎ 手動輸入</div></div>
+          <!-- 金額 -->
+          <div style="display:flex;align-items:baseline;justify-content:space-between;padding:2px 2px 0">
+            <span class="muted">金額</span>
+            <span style="font-size:26px;font-weight:800;color:var(--accent)">$3,280<span style="opacity:.4">|</span></span>
+          </div>
+          <!-- 種類（先選） -->
+          <div style="font-size:12px;color:var(--sub);margin:10px 2px 4px">種類</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">
+            <div class="catmini on">🥬 食材</div><div class="catmini">🍶 飲料</div><div class="catmini">👨‍🍳 人工</div>
+            <div class="catmini">🏠 租金</div><div class="catmini">💡 水電</div><div class="catmini">📦 其他</div>
+          </div>
+          <!-- 供應商（種類之下） -->
+          <div style="font-size:12px;color:var(--sub);margin:12px 2px 4px">供應商名稱</div>
+          <div class="field" style="margin:0;border-color:var(--accent)"><div class="val">美心蔬果行<span style="opacity:.4">|</span></div></div>
+          <div class="muted" style="font-size:11px;margin:5px 2px 0">打「美」自動跳出 ▸ 美心蔬果行 · 美聯凍肉</div>
+          <!-- 日期 -->
+          <div style="display:flex;gap:7px;margin:10px 0 4px">
+            <span class="pill" style="padding:4px 11px">📅 今天 6/27</span>
+            <span class="pill" style="padding:4px 11px">📎 附單據相</span>
+          </div>
+          <!-- 較小的數字鍵盤 -->
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;margin-top:8px">
+            <div class="key sm">1</div><div class="key sm">2</div><div class="key sm">3</div>
+            <div class="key sm">4</div><div class="key sm">5</div><div class="key sm">6</div>
+            <div class="key sm">7</div><div class="key sm">8</div><div class="key sm">9</div>
+            <div class="key sm">.</div><div class="key sm">0</div><div class="key sm">⌫</div>
+          </div>
+          <div class="btn" style="margin:10px 0 14px">✓ 儲存</div>
+        </div>
+        <div class="tabbar">
+          <div><i>🏠</i>首頁</div><div class="on"><i>📋</i>單據</div>
+          <div><i>📊</i>結算</div><div><i>⚙️</i>設定</div>
+        </div>
+      </div></div>
+      <div class="cap">②b 手動輸入<small>金額 → 先選種類 → 供應商 → 縮小鍵盤</small></div>
+    </div>
+
+    <!-- 2c 人工專用 -->
+    <div class="col">
+      <div class="phone"><div class="screen">
+        <div class="sb">9:41　　●●●　📶 🔋</div>
+        <div class="body" style="padding:0 14px;display:flex;flex-direction:column;overflow:auto">
+          <div class="title">新增單據</div>
+          <div class="seg"><div>📷 掃描單據</div><div class="on">✎ 手動輸入</div></div>
+          <div style="font-size:12px;color:var(--sub);margin:6px 2px 4px">種類</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">
+            <div class="catmini">🥬 食材</div><div class="catmini">🍶 飲料</div><div class="catmini on">👨‍🍳 人工</div>
+            <div class="catmini">🏠 租金</div><div class="catmini">💡 水電</div><div class="catmini">📦 其他</div>
+          </div>
+          <!-- 人工專屬：時薪 × 工時 -->
+          <div class="card" style="margin:12px 0 0;padding:12px">
+            <div style="display:flex;gap:8px">
+              <div style="flex:1"><div class="lab muted" style="font-size:11px">時薪</div>
+                <div style="font-size:18px;font-weight:700;margin-top:2px">$65</div></div>
+              <div style="align-self:center;color:var(--sub)">×</div>
+              <div style="flex:1"><div class="lab muted" style="font-size:11px">工作小時</div>
+                <div style="font-size:18px;font-weight:700;margin-top:2px">8.5</div></div>
+            </div>
+            <div style="border-top:1px solid var(--line);margin-top:10px;padding-top:10px;display:flex;justify-content:space-between;align-items:baseline">
+              <span class="muted">= 工資（自動算）</span>
+              <span style="font-size:22px;font-weight:800;color:var(--accent)">$552.50</span>
+            </div>
+          </div>
+          <!-- 員工名稱（備註） -->
+          <div style="font-size:12px;color:var(--sub);margin:12px 2px 4px">員工名稱（記為備註）</div>
+          <div class="field" style="margin:0;border-color:var(--accent)"><div class="val">阿強<span style="opacity:.4">|</span></div></div>
+          <div style="display:flex;gap:7px;margin:10px 0 4px">
+            <span class="pill" style="padding:4px 11px">📅 今天 6/27</span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;margin-top:6px">
+            <div class="key sm">1</div><div class="key sm">2</div><div class="key sm">3</div>
+            <div class="key sm">4</div><div class="key sm">5</div><div class="key sm">6</div>
+            <div class="key sm">7</div><div class="key sm">8</div><div class="key sm">9</div>
+            <div class="key sm">.</div><div class="key sm">0</div><div class="key sm">⌫</div>
+          </div>
+          <div class="btn" style="margin:10px 0 14px">✓ 儲存工資</div>
+        </div>
+        <div class="tabbar">
+          <div><i>🏠</i>首頁</div><div class="on"><i>📋</i>單據</div>
+          <div><i>📊</i>結算</div><div><i>⚙️</i>設定</div>
+        </div>
+      </div></div>
+      <div class="cap">②c 人工專用<small>選「人工」自動變身：時薪 × 工時 = 工資，記員工名</small></div>
+    </div>
+
+    <!-- 3 核對 -->
+    <div class="col">
+      <div class="phone"><div class="screen">
+        <div class="sb">9:41　　●●●　📶 🔋</div>
+        <div class="body">
+          <div class="title">核對 & 分類</div>
+          <div class="muted">辨識好了，看一眼有沒有錯</div>
+          <div class="field edit"><div class="lab">金額</div><div class="val">$3,280.00</div></div>
+          <div class="field"><div class="lab">日期</div><div class="val">2026-06-27</div></div>
+          <div class="field"><div class="lab">店家 / 供應商</div><div class="val">美心蔬果行</div></div>
+          <div style="margin:10px 2px 4px;font-size:12px;color:var(--sub)">分類（自動猜：食材入貨 ✓）</div>
+          <div>
+            <span class="pill on">🥬 食材入貨</span><span class="pill">🍶 飲料酒水</span>
+            <span class="pill">👨‍🍳 人工</span><span class="pill">💡 水電煤</span>
+            <span class="pill">🧻 清潔耗材</span><span class="pill">📦 其他</span>
+          </div>
+          <div class="btn">✓ 儲存這張</div>
+        </div>
+        <div class="tabbar">
+          <div><i>🏠</i>首頁</div><div class="on"><i>📋</i>單據</div>
+          <div><i>📊</i>結算</div><div><i>⚙️</i>設定</div>
+        </div>
+      </div></div>
+      <div class="cap">③ 核對 & 分類<small>自動填好＋自動猜分類，錯了當場改，按儲存</small></div>
+    </div>
+
+    <!-- 4 結算 -->
+    <div class="col">
+      <div class="phone"><div class="screen">
+        <div class="sb">9:41　　●●●　📶 🔋</div>
+        <div class="body">
+          <div class="title">結算</div>
+          <div class="seg"><div>日</div><div class="on">月</div><div>年</div></div>
+          <div class="muted">2026 年 6 月 · 總支出</div>
+          <div class="big" style="color:var(--accent2)">$128,450</div>
+          <div style="margin-top:12px">
+            <div class="bar"><span style="width:62px">🥬 食材</span><div class="track"><div class="fill" style="width:55%;background:#3ddc84"></div></div><b>$70k</b></div>
+            <div class="bar"><span style="width:62px">👨‍🍳 人工</span><div class="track"><div class="fill" style="width:25%;background:#ffb648"></div></div><b>$32k</b></div>
+            <div class="bar"><span style="width:62px">🏠 租金</span><div class="track"><div class="fill" style="width:12%;background:#b58cff"></div></div><b>$15k</b></div>
+            <div class="bar"><span style="width:62px">💡 水電</span><div class="track"><div class="fill" style="width:7%;background:#ff8fa3"></div></div><b>$9k</b></div>
+          </div>
+          <div class="btn">⤓ 匯出試算表（Excel / CSV）</div>
+        </div>
+        <div class="tabbar">
+          <div><i>🏠</i>首頁</div><div><i>📋</i>單據</div>
+          <div class="on"><i>📊</i>結算</div><div><i>⚙️</i>設定</div>
+        </div>
+      </div></div>
+      <div class="cap">④ 日/月/年結<small>切日月年，按分類看比重，一鍵匯出試算表</small></div>
+    </div>
+
+    <!-- 5 匯出 -->
+    <div class="col">
+      <div class="phone"><div class="screen">
+        <div class="sb">9:41　　●●●　📶 🔋</div>
+        <div class="body">
+          <div class="title">匯出試算表</div>
+          <div class="muted">選範圍與格式</div>
+          <div class="field"><div class="lab">期間</div><div class="val">2026 年 6 月</div></div>
+          <div class="seg"><div class="on">Excel</div><div>CSV</div></div>
+          <div class="card">
+            <div class="muted" style="margin-bottom:6px">內容預覽</div>
+            <div style="font-size:11px;line-height:1.9;font-family:monospace;color:var(--sub)">
+              日期&nbsp;&nbsp;&nbsp;&nbsp;分類&nbsp;&nbsp;&nbsp;店家&nbsp;&nbsp;&nbsp;金額<br>
+              06-27&nbsp;食材&nbsp;&nbsp;美心&nbsp;&nbsp;3,280<br>
+              06-26&nbsp;飲料&nbsp;&nbsp;可樂&nbsp;&nbsp;1,560<br>
+              06-24&nbsp;水電&nbsp;&nbsp;中電&nbsp;&nbsp;8,900<br>
+              …（含每月分類小計）
+            </div>
+          </div>
+          <div class="btn">📤 匯出並分享（WhatsApp / Email）</div>
+          <div class="muted" style="text-align:center;margin-top:8px">將來可加：直接存到 Google Sheets</div>
+        </div>
+        <div class="tabbar">
+          <div><i>🏠</i>首頁</div><div><i>📋</i>單據</div>
+          <div class="on"><i>📊</i>結算</div><div><i>⚙️</i>設定</div>
+        </div>
+      </div></div>
+      <div class="cap">⑤ 匯出<small>Excel/CSV，含明細＋分類小計，直接分享出去</small></div>
+    </div>
+
+    <!-- 說明 -->
+    <div class="note">
+      <h2>第一版功能清單</h2>
+      <ul>
+        <li><b>記一筆</b>：掃描單據（OCR 自動讀金額/日期/店名）或手動輸入</li>
+        <li><b>自動分類</b>：供應商記憶 ＋ 關鍵字（免費、離線；用越久越準）</li>
+        <li><b>單據庫</b>：每張存影像當憑證，可搜尋、改、刪</li>
+        <li><b>日 / 月 / 年結</b>：按分類看金額與比重</li>
+        <li><b>匯出試算表</b>：Excel / CSV，含明細與分類小計，可分享</li>
+        <li><b>連結下載</b>：用網頁 App（PWA），開連結「加到主畫面」即用，雙系統通吃，免上架</li>
+      </ul>
+      <h2>預留將來</h2>
+      <ul>
+        <li>AI 自動分類開關（要時再加後台＋Key）</li>
+        <li>直接同步到 Google Sheets</li>
+        <li>多人/多分店</li>
+      </ul>
+      <h2>還想跟你確認兩件小事</h2>
+      <ul>
+        <li>分類就用這 <b>8 個</b>（食材入貨／飲料酒水／人工／租金／水電煤／設備維修／清潔耗材／其他）夠嗎？要加要減？</li>
+        <li>匯出主打 <b>Excel/CSV 檔分享</b>，方向 OK 嗎？</li>
+      </ul>
+    </div>
+
+  </div>
+</body>
+</html>
