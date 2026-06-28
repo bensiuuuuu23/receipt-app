@@ -27,6 +27,15 @@
     return '$' + v.toLocaleString('en-US', { minimumFractionDigits: v % 1 ? 2 : 0, maximumFractionDigits: 2 });
   }
   function monthKey(iso) { return (iso || '').slice(0, 7); }
+  // 合理的單據日期：不可未來、不早於約 2 年前（防 OCR 看錯年份）
+  function plausibleDate(iso) {
+    const t = todayISO();
+    if (iso > t) return false;
+    const past = new Date(); past.setFullYear(past.getFullYear() - 2);
+    const off = past.getTimezoneOffset();
+    const limit = new Date(past.getTime() - off * 60000).toISOString().slice(0, 10);
+    return iso >= limit;
+  }
   function fmtDayLabel(iso) {
     if (iso === todayISO()) return '今天';
     return iso;
@@ -205,14 +214,20 @@
       const text = await OCR.recognize(blob, (p) => { st.textContent = `辨識中… ${p}%`; });
       const got = OCR.parse(text);
       let filled = [];
+      let dateWarn = false;
       // 只填空欄位，不蓋掉使用者已打好的字
       if (got.amount && selectedCat !== 'labor' && !$('#fAmount').value) { $('#fAmount').value = got.amount; filled.push('金額'); }
-      if (got.date) { $('#fDate').value = got.date; filled.push('日期'); }
+      // 日期防呆：未來、或太舊（>2年）多半是看錯，改用今天
+      if (got.date) {
+        if (plausibleDate(got.date)) { $('#fDate').value = got.date; filled.push('日期'); }
+        else dateWarn = true; // 保留今天（預設）
+      }
       if (got.supplier && selectedCat !== 'labor' && !$('#fSupplier').value.trim()) {
         $('#fSupplier').value = got.supplier; onSupplierInput(); filled.push('店名');
       }
-      st.textContent = filled.length
-        ? `已自動填：${filled.join('、')} —— 請核對是否正確` : '讀不太到，請手動輸入';
+      let msg = filled.length ? `已自動填：${filled.join('、')} —— 請核對是否正確` : '讀不太到，請手動輸入';
+      if (dateWarn) msg += '（日期看不準，已用今天，請改）';
+      st.textContent = msg;
     } catch (err) {
       st.classList.add('err');
       st.textContent = String(err.message || err);
