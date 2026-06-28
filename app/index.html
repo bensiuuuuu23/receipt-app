@@ -55,8 +55,23 @@
       </header>
       <div class="content">
         <div class="seg" id="modeSeg">
-          <div data-mode="scan" class="dim">📷 掃描（第 3 步）</div>
+          <div data-mode="scan">📷 掃描單據</div>
           <div data-mode="manual" class="on">✎ 手動輸入</div>
+        </div>
+
+        <!-- 照片 / OCR -->
+        <div id="photoArea">
+          <div class="photo-actions">
+            <button class="btn ghost photo-btn" id="btnCamera">📷 拍照</button>
+            <button class="btn ghost photo-btn" id="btnAlbum">🖼 選相</button>
+          </div>
+          <div id="ocrStatus" class="ocr-status"></div>
+          <div id="photoPreview" hidden>
+            <img id="photoImg" alt="單據影像">
+            <button id="btnRemovePhoto" class="photo-remove">✕ 移除照片</button>
+          </div>
+          <input type="file" id="fileCamera" accept="image/*" capture="environment" hidden>
+          <input type="file" id="fileAlbum" accept="image/*" hidden>
         </div>
 
         <!-- 金額 -->
@@ -115,6 +130,7 @@
 
   <script src="db.js"></script>
   <script src="classify.js"></script>
+  <script src="ocr.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

@@ -1,7 +1,7 @@
 /* 本機資料庫（IndexedDB）—— 單據 receipts、供應商記憶 suppliers */
 const DB = (() => {
   const NAME = 'receipt-app';
-  const VERSION = 1;
+  const VERSION = 2;
   let db;
 
   function open() {
@@ -15,6 +15,9 @@ const DB = (() => {
         }
         if (!d.objectStoreNames.contains('suppliers')) {
           d.createObjectStore('suppliers', { keyPath: 'name' });
+        }
+        if (!d.objectStoreNames.contains('photos')) {
+          d.createObjectStore('photos', { keyPath: 'receiptId' }); // { receiptId, blob }
         }
       };
       req.onsuccess = (e) => { db = e.target.result; resolve(db); };

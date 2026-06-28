@@ -8,6 +8,9 @@
   let editingId = null;         // 正在編輯的單據 id（null = 新增）
   let selectedCat = null;       // 目前選的分類 id
   let manualCatOverride = false;// 使用者是否手動點過分類
+  let pendingPhoto = null;      // 待存的照片 Blob（null = 沒有）
+  let photoChanged = false;     // 這次編輯有沒有改動照片
+  let photoURL = null;          // 預覽用的 object URL（記得 revoke）
 
   const $ = (sel) => document.querySelector(sel);
   const $$ = (sel) => Array.from(document.querySelectorAll(sel));
@@ -58,7 +61,7 @@
   function itemHTML(r) {
     const c = catOf(r.categoryId);
     const title = r.supplier || r.employee || c.name;
-    const sub = `${c.name} · ${fmtDayLabel(r.date)}${r.employee ? ' · ' + r.employee : ''}`;
+    const sub = `${c.name} · ${fmtDayLabel(r.date)}${r.employee ? ' · ' + r.employee : ''}${r.hasPhoto ? ' · 📎' : ''}`;
     return `<div class="item" data-id="${r.id}">
       <div class="dot" style="background:${hexA(c.color, .15)}">${c.icon}</div>
       <div class="mid"><div class="n">${esc(title)}</div><div class="s">${esc(sub)}</div></div>
@@ -144,9 +147,83 @@
     else hint.textContent = '新供應商，請選種類（下次會自動記住）';
   }
 
-  function openAdd(id) {
+  // ---- 照片 / OCR ----
+  function setPhotoPreview(blob) {
+    if (photoURL) { URL.revokeObjectURL(photoURL); photoURL = null; }
+    if (blob) {
+      photoURL = URL.createObjectURL(blob);
+      $('#photoImg').src = photoURL;
+      $('#photoPreview').hidden = false;
+    } else {
+      $('#photoImg').removeAttribute('src');
+      $('#photoPreview').hidden = true;
+    }
+  }
+
+  function clearPhotoUI() {
+    pendingPhoto = null;
+    photoChanged = false;
+    setPhotoPreview(null);
+    $('#ocrStatus').textContent = '';
+    $('#ocrStatus').classList.remove('err');
+    $('#fileCamera').value = '';
+    $('#fileAlbum').value = '';
+  }
+
+  // 壓縮：最長邊 1280、JPEG 0.7（省空間，也方便日後上傳 Drive）
+  function compressImage(file) {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const max = 1280;
+        let { width: w, height: h } = img;
+        if (w > max || h > max) { const s = max / Math.max(w, h); w = Math.round(w * s); h = Math.round(h * s); }
+        const cv = document.createElement('canvas');
+        cv.width = w; cv.height = h;
+        cv.getContext('2d').drawImage(img, 0, 0, w, h);
+        cv.toBlob((b) => { URL.revokeObjectURL(img.src); resolve(b || file); }, 'image/jpeg', 0.7);
+      };
+      img.onerror = () => resolve(file);
+      img.src = URL.createObjectURL(file);
+    });
+  }
+
+  async function onPhotoPicked(file, autoOCR) {
+    if (!file) return;
+    const blob = await compressImage(file);
+    pendingPhoto = blob;
+    photoChanged = true;
+    setPhotoPreview(blob);
+    if (autoOCR) runOCR(blob);
+  }
+
+  async function runOCR(blob) {
+    const st = $('#ocrStatus');
+    st.classList.remove('err');
+    st.textContent = '辨識中… 0%（首次需下載辨識模組，請稍候）';
+    try {
+      const text = await OCR.recognize(blob, (p) => { st.textContent = `辨識中… ${p}%`; });
+      const got = OCR.parse(text);
+      let filled = [];
+      // 只填空欄位，不蓋掉使用者已打好的字
+      if (got.amount && selectedCat !== 'labor' && !$('#fAmount').value) { $('#fAmount').value = got.amount; filled.push('金額'); }
+      if (got.date) { $('#fDate').value = got.date; filled.push('日期'); }
+      if (got.supplier && selectedCat !== 'labor' && !$('#fSupplier').value.trim()) {
+        $('#fSupplier').value = got.supplier; onSupplierInput(); filled.push('店名');
+      }
+      st.textContent = filled.length
+        ? `已自動填：${filled.join('、')} —— 請核對是否正確` : '讀不太到，請手動輸入';
+    } catch (err) {
+      st.classList.add('err');
+      st.textContent = String(err.message || err);
+    }
+  }
+
+  async function openAdd(id) {
     editingId = id || null;
     manualCatOverride = false;
+    clearPhotoUI();
+    setMode('manual');
     const r = id ? receipts.find((x) => x.id === id) : null;
 
     $('#addTitle').textContent = r ? '編輯單據' : '新增單據';
@@ -169,7 +246,16 @@
     refreshSupplierList();
     updateSupplierHint($('#fSupplier').value.trim());
 
+    if (r && r.hasPhoto) {
+      const p = await DB.get('photos', r.id);
+      if (p && p.blob) { pendingPhoto = p.blob; photoChanged = false; setPhotoPreview(p.blob); }
+    }
+
     show('add');
+  }
+
+  function setMode(mode) {
+    $$('#modeSeg div').forEach((d) => d.classList.toggle('on', d.dataset.mode === mode));
   }
 
   async function save() {
@@ -198,11 +284,17 @@
       hours: labor ? (parseFloat($('#fHours').value) || 0) : null,
       date: $('#fDate').value || todayISO(),
       note: $('#fNote').value.trim(),
+      hasPhoto: !!pendingPhoto,
       createdAt: editingId ? (receipts.find((x) => x.id === editingId)?.createdAt || Date.now()) : Date.now(),
       synced: false,
     };
 
     await DB.put('receipts', rec);
+    // 照片：本機存放（將來第 2 步同步到 Google Drive）
+    if (photoChanged) {
+      if (pendingPhoto) await DB.put('photos', { receiptId: rec.id, blob: pendingPhoto });
+      else await DB.remove('photos', rec.id);
+    }
     // 供應商記憶：記住這家歸哪類
     if (supplier) { suppliersMap[supplier] = selectedCat; await DB.put('suppliers', { name: supplier, categoryId: selectedCat }); }
 
@@ -215,6 +307,7 @@
     if (!editingId) return;
     if (!confirm('確定刪除這張單據？')) return;
     await DB.remove('receipts', editingId);
+    await DB.remove('photos', editingId);
     await reload();
     show('list');
     renderList();
@@ -239,7 +332,24 @@
       };
     });
     $('#fab').onclick = () => openAdd(null);
-    $('#addCancel').onclick = () => { show('home'); renderHome(); };
+    $('#addCancel').onclick = () => { clearPhotoUI(); show('home'); renderHome(); };
+
+    // 模式切換：掃描 = 直接拍照
+    $$('#modeSeg div').forEach((d) => {
+      d.onclick = () => {
+        setMode(d.dataset.mode);
+        if (d.dataset.mode === 'scan') $('#fileCamera').click();
+      };
+    });
+    // 拍照 / 選相
+    $('#btnCamera').onclick = () => $('#fileCamera').click();
+    $('#btnAlbum').onclick = () => $('#fileAlbum').click();
+    $('#fileCamera').onchange = (e) => onPhotoPicked(e.target.files[0], true);
+    $('#fileAlbum').onchange = (e) => onPhotoPicked(e.target.files[0], true);
+    $('#btnRemovePhoto').onclick = () => {
+      pendingPhoto = null; photoChanged = true; setPhotoPreview(null);
+      $('#ocrStatus').textContent = ''; $('#fileCamera').value = ''; $('#fileAlbum').value = '';
+    };
     $('#btnSave').onclick = save;
     $('#btnDelete').onclick = del;
     $('#fWage').oninput = computeLabor;
