@@ -85,6 +85,50 @@
   }
   function esc(s) { return String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
 
+  // ---- 結算（日/月/年）----
+  let sumMode = 'month';
+  let sumAnchor = todayISO();
+
+  function periodRange(mode, anchor) {
+    const y = anchor.slice(0, 4), ym = anchor.slice(0, 7);
+    if (mode === 'day') return { start: anchor, end: anchor, label: anchor === todayISO() ? `今天（${anchor}）` : anchor };
+    if (mode === 'year') return { start: `${y}-01-01`, end: `${y}-12-31`, label: `${y} 年` };
+    return { start: `${ym}-01`, end: `${ym}-31`, label: `${ym.slice(0, 4)} 年 ${ym.slice(5, 7)} 月` };
+  }
+
+  function shiftAnchor(delta) {
+    const d = new Date(sumAnchor + 'T00:00:00');
+    if (sumMode === 'day') d.setDate(d.getDate() + delta);
+    else if (sumMode === 'year') d.setFullYear(d.getFullYear() + delta);
+    else d.setMonth(d.getMonth() + delta);
+    const off = d.getTimezoneOffset();
+    sumAnchor = new Date(d.getTime() - off * 60000).toISOString().slice(0, 10);
+  }
+
+  function renderSummary() {
+    $$('#sumSeg div').forEach((el) => el.classList.toggle('on', el.dataset.m === sumMode));
+    const { start, end, label } = periodRange(sumMode, sumAnchor);
+    $('#sumLabel').textContent = label;
+    const mine = receipts.filter((r) => r.date >= start && r.date <= end);
+    const total = mine.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+    $('#sumTotal').textContent = money(total);
+    $('#sumCount').textContent = `共 ${mine.length} 張`;
+
+    if (!mine.length) { $('#sumBreakdown').innerHTML = '<div class="empty">這段期間沒有單據。</div>'; return; }
+    const byCat = {};
+    for (const r of mine) byCat[r.categoryId] = (byCat[r.categoryId] || 0) + (Number(r.amount) || 0);
+    const rows = Object.entries(byCat).sort((a, b) => b[1] - a[1]);
+    $('#sumBreakdown').innerHTML = rows.map(([cid, val]) => {
+      const c = catOf(cid);
+      const pct = total ? Math.round((val / total) * 100) : 0;
+      return `<div class="sbar">
+        <span class="lab">${c.icon} ${esc(c.name)}</span>
+        <span class="track"><span class="fill" style="width:${pct}%;background:${c.color}"></span></span>
+        <span class="val">${money(val)}</span><span class="pct">${pct}%</span>
+      </div>`;
+    }).join('');
+  }
+
   // ---- 單據庫 ----
   function renderList() {
     $('#listCount').textContent = `共 ${receipts.length} 張`;
@@ -344,8 +388,14 @@
         show(g);
         if (g === 'home') renderHome();
         if (g === 'list') renderList();
+        if (g === 'summary') renderSummary();
       };
     });
+    $$('#sumSeg div').forEach((el) => {
+      el.onclick = () => { sumMode = el.dataset.m; sumAnchor = todayISO(); renderSummary(); };
+    });
+    $('#sumPrev').onclick = () => { shiftAnchor(-1); renderSummary(); };
+    $('#sumNext').onclick = () => { shiftAnchor(1); renderSummary(); };
     $('#fab').onclick = () => openAdd(null);
     $('#addCancel').onclick = () => { clearPhotoUI(); show('home'); renderHome(); };
 

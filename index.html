@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <title>餐廳記帳</title>
-<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="styles.css?v=3">
 </head>
 <body>
   <div id="app">
@@ -28,10 +28,22 @@
       <div class="content"><div id="listAll"></div></div>
     </section>
 
-    <!-- 結算（第 2 步做） -->
+    <!-- 結算：日 / 月 / 年 -->
     <section class="screen" data-screen="summary" hidden>
       <header class="hd"><div class="hd-title">結算</div></header>
-      <div class="content"><div class="card center muted">日 / 月 / 年結將在第 2 步加入。</div></div>
+      <div class="content">
+        <div class="seg" id="sumSeg">
+          <div data-m="day">日</div><div data-m="month" class="on">月</div><div data-m="year">年</div>
+        </div>
+        <div class="period-nav">
+          <button id="sumPrev" aria-label="上一期">‹</button>
+          <div id="sumLabel">—</div>
+          <button id="sumNext" aria-label="下一期">›</button>
+        </div>
+        <div class="card center"><div class="big" id="sumTotal">$0</div><div class="muted" id="sumCount">共 0 張</div></div>
+        <div class="muted sec-label">分類明細</div>
+        <div id="sumBreakdown"></div>
+      </div>
     </section>
 
     <!-- 設定（後面做） -->
@@ -128,9 +140,9 @@
 
   </div>
 
-  <script src="db.js"></script>
-  <script src="classify.js"></script>
-  <script src="ocr.js"></script>
-  <script src="app.js"></script>
+  <script src="db.js?v=3"></script>
+  <script src="classify.js?v=3"></script>
+  <script src="ocr.js?v=3"></script>
+  <script src="app.js?v=3"></script>
 </body>
 </html>
