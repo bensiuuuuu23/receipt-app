@@ -97,3 +97,16 @@ body{background:var(--bg);color:var(--ink);overflow:hidden}
 .photo-remove{position:absolute;top:8px;right:8px;background:rgba(0,0,0,.6);color:#fff;border:none;
   border-radius:8px;padding:6px 10px;font-size:12px}
 .item .thumb{width:38px;height:38px;border-radius:9px;object-fit:cover;flex:0 0 auto}
+
+/* 結算 */
+.period-nav{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:10px 0}
+.period-nav button{background:#13161c;border:1px solid var(--line);color:var(--ink);
+  border-radius:10px;width:46px;height:42px;font-size:22px}
+.period-nav button:active{background:#1d212a}
+#sumLabel{font-size:16px;font-weight:700;flex:1;text-align:center}
+.sbar{display:flex;align-items:center;gap:8px;margin:11px 0;font-size:13px}
+.sbar .lab{width:92px;display:flex;align-items:center;gap:5px;flex:0 0 auto}
+.sbar .track{flex:1;height:9px;background:#222732;border-radius:99px;overflow:hidden}
+.sbar .fill{height:100%;border-radius:99px}
+.sbar .val{width:78px;text-align:right;font-weight:700;flex:0 0 auto}
+.sbar .pct{width:40px;text-align:right;color:var(--sub);font-size:11px;flex:0 0 auto}
