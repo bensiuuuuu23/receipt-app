@@ -196,6 +196,19 @@
     $('#supplierList').innerHTML = names.map((n) => `<option value="${esc(n)}">`).join('');
   }
 
+  // 拍照 OCR 用：整段文字裡若出現已知供應商名（記過的優先、長名優先）就命中
+  function matchKnownSupplier(text) {
+    if (!text) return null;
+    const t = text.replace(/\s+/g, '').toLowerCase();
+    const entries = [...Object.entries(suppliersMap), ...Object.entries(DEFAULT_SUPPLIER_MAP)];
+    entries.sort((a, b) => b[0].length - a[0].length); // 長名優先，避免短名誤中
+    for (const [name, cat] of entries) {
+      const n = name.replace(/\s+/g, '').toLowerCase();
+      if (n.length >= 2 && t.includes(n)) return { supplier: name, cat };
+    }
+    return null;
+  }
+
   function onSupplierInput() {
     // 種類先選，供應商不再回頭改種類，只更新提示
     updateSupplierHint($('#fSupplier').value.trim());
@@ -269,6 +282,15 @@
       const got = OCR.parse(text);
       let filled = [];
       let dateWarn = false;
+
+      // 認名字：OCR 文字裡若出現已知供應商 → 自動選種類 + 填供應商
+      const known = matchKnownSupplier(text);
+      if (known && !manualCatOverride && selectedCat !== 'labor') {
+        setCat(known.cat); // 展開供應商/金額欄、篩該類供應商
+        if (!$('#fSupplier').value.trim()) { $('#fSupplier').value = known.supplier; onSupplierInput(); }
+        filled.push(`種類（${catOf(known.cat).name}）`, `供應商（${known.supplier}）`);
+      }
+
       // 只填空欄位，不蓋掉使用者已打好的字
       if (got.amount && selectedCat !== 'labor' && !$('#fAmount').value) { $('#fAmount').value = got.amount; filled.push('金額'); }
       // 日期防呆：未來、或太舊（>2年）多半是看錯，改用今天
@@ -276,10 +298,13 @@
         if (plausibleDate(got.date)) { $('#fDate').value = got.date; filled.push('日期'); }
         else dateWarn = true; // 保留今天（預設）
       }
-      if (got.supplier && selectedCat !== 'labor' && !$('#fSupplier').value.trim()) {
-        $('#fSupplier').value = got.supplier; onSupplierInput(); filled.push('店名');
+      // 沒認到已知供應商、但有選過種類 → 用 OCR 猜的店名填（標明是「猜」）
+      if (!known && got.supplier && selectedCat && selectedCat !== 'labor' && !$('#fSupplier').value.trim()) {
+        $('#fSupplier').value = got.supplier; onSupplierInput(); filled.push('店名（猜，請核對）');
       }
-      let msg = filled.length ? `已自動填：${filled.join('、')} —— 請核對是否正確` : '讀不太到，請手動輸入';
+
+      let msg = filled.length ? `已自動填：${filled.join('、')} —— 請核對是否正確` : '讀不太到，請手動選種類';
+      if (!selectedCat) msg += '（金額已幫你記著，請先選種類就會顯示）';
       if (dateWarn) msg += '（日期看不準，已用今天，請改）';
       st.textContent = msg;
     } catch (err) {
