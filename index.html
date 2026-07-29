@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <title>餐廳記帳</title>
-<link rel="stylesheet" href="styles.css?v=4">
+<link rel="stylesheet" href="styles.css?v=5">
 </head>
 <body>
   <div id="app">
@@ -86,15 +86,7 @@
           <input type="file" id="fileAlbum" accept="image/*" hidden>
         </div>
 
-        <!-- 供應商（先選供應商，會自動帶種類） -->
-        <div id="supplierBox">
-          <div class="muted sec-label">供應商名稱</div>
-          <input id="fSupplier" class="text-input" list="supplierList" placeholder="例：港聯、李光記…" autocomplete="off">
-          <datalist id="supplierList"></datalist>
-          <div class="muted hint" id="supplierHint"></div>
-        </div>
-
-        <!-- 種類 -->
+        <!-- 種類（先選種類，供應商欄只顯示這類的店） -->
         <div class="muted sec-label">種類</div>
         <div class="cat-grid" id="catGrid"></div>
 
@@ -112,8 +104,16 @@
           <input id="fEmployee" class="text-input" placeholder="例：阿強">
         </div>
 
+        <!-- 供應商（只列所選種類的供應商，可打字新增） -->
+        <div id="supplierBox" hidden>
+          <div class="muted sec-label">供應商名稱</div>
+          <input id="fSupplier" class="text-input" list="supplierList" placeholder="選擇或輸入供應商" autocomplete="off">
+          <datalist id="supplierList"></datalist>
+          <div class="muted hint" id="supplierHint"></div>
+        </div>
+
         <!-- 金額 -->
-        <div class="amt-row" id="amountRow">
+        <div class="amt-row" id="amountRow" hidden>
           <span class="muted">金額</span>
           <input id="fAmount" class="amt-input" inputmode="decimal" placeholder="0.00">
         </div>
@@ -140,9 +140,9 @@
 
   </div>
 
-  <script src="db.js?v=4"></script>
-  <script src="classify.js?v=4"></script>
-  <script src="ocr.js?v=4"></script>
-  <script src="app.js?v=4"></script>
+  <script src="db.js?v=5"></script>
+  <script src="classify.js?v=5"></script>
+  <script src="ocr.js?v=5"></script>
+  <script src="app.js?v=5"></script>
 </body>
 </html>
