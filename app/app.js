@@ -180,7 +180,11 @@
   }
 
   function refreshSupplierList() {
-    const names = Object.keys(suppliersMap).sort();
+    // 內建常用供應商 + 使用者記過的供應商，一起做自動補全
+    const names = Array.from(new Set([
+      ...Object.keys(DEFAULT_SUPPLIER_MAP),
+      ...Object.keys(suppliersMap),
+    ])).sort();
     $('#supplierList').innerHTML = names.map((n) => `<option value="${esc(n)}">`).join('');
   }
 
@@ -196,6 +200,7 @@
     const hint = $('#supplierHint');
     if (!name) { hint.textContent = ''; return; }
     if (suppliersMap[name]) hint.textContent = `記得這家 → ${catOf(suppliersMap[name]).name}`;
+    else if (DEFAULT_SUPPLIER_MAP[name]) hint.textContent = `常用供應商 → ${catOf(DEFAULT_SUPPLIER_MAP[name]).name}`;
     else if (keywordGuess(name)) hint.textContent = `猜：${catOf(keywordGuess(name)).name}（可改）`;
     else hint.textContent = '新供應商，請選種類（下次會自動記住）';
   }
@@ -421,11 +426,13 @@
     $('#fHours').oninput = computeLabor;
     $('#fSupplier').oninput = onSupplierInput;
     $('#btnClearAll').onclick = async () => {
-      if (!confirm('清空所有單據？此動作不可還原（雲端同步後會以雲端為準）。')) return;
+      if (!confirm('清空所有單據、照片與供應商記憶？此動作不可還原（雲端同步後會以雲端為準）。')) return;
       await DB.clear('receipts');
+      await DB.clear('photos');
+      await DB.clear('suppliers');
       await reload();
       renderList();
-      alert('已清空');
+      alert('已清空，可從新種類重新開始');
     };
   }
 
