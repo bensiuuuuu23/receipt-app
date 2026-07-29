@@ -11,6 +11,9 @@
   let pendingPhoto = null;      // 待存的照片 Blob（null = 沒有）
   let photoChanged = false;     // 這次編輯有沒有改動照片
   let photoURL = null;          // 預覽用的 object URL（記得 revoke）
+  let batchDrafts = [];         // 批次入單的草稿列
+  const ocrQueue = [];          // 待辨識的草稿 id 佇列
+  let ocrBusy = false;          // 批次 OCR 是否正在跑
 
   const $ = (sel) => document.querySelector(sel);
   const $$ = (sel) => Array.from(document.querySelectorAll(sel));
@@ -407,6 +410,199 @@
     renderList();
   }
 
+  // ---- 批次入單 ----
+  function openBatch() {
+    clearBatch();
+    renderBatch();
+    show('batch');
+  }
+
+  function clearBatch() {
+    for (const d of batchDrafts) if (d.thumbURL) URL.revokeObjectURL(d.thumbURL);
+    batchDrafts = [];
+    ocrQueue.length = 0;
+  }
+
+  // 批次種類下拉（不含「人工」，人工用時薪×工時另記）
+  function batchCatOptions(selected) {
+    const opts = ['<option value="">種類…</option>'];
+    for (const c of CATEGORIES) {
+      if (c.id === 'labor') continue;
+      opts.push(`<option value="${c.id}"${selected === c.id ? ' selected' : ''}>${c.icon} ${esc(c.name)}</option>`);
+    }
+    return opts.join('');
+  }
+
+  function supplierOptionsFor(catId) {
+    return suppliersForCat(catId).map((n) => `<option value="${esc(n)}">`).join('');
+  }
+
+  function draftRowHTML(d) {
+    const supListId = 'supList-' + d.id;
+    const stCls = d.status === 'done' ? ' done' : d.status === 'err' ? ' err' : '';
+    return `<div class="draft" data-id="${d.id}">
+      <div class="draft-top">
+        <div class="draft-thumb"><img src="${d.thumbURL}" alt=""></div>
+        <select class="draft-cat">${batchCatOptions(d.categoryId)}</select>
+        <button class="draft-del" title="刪除">🗑</button>
+      </div>
+      <div class="draft-row2">
+        <input class="text-input draft-sup" list="${supListId}" placeholder="供應商" value="${esc(d.supplier)}">
+        <datalist id="${supListId}">${supplierOptionsFor(d.categoryId)}</datalist>
+        <input class="text-input draft-amt" inputmode="decimal" placeholder="金額" value="${esc(d.amount)}">
+      </div>
+      <div class="draft-status${stCls}">${esc(d.statusText)}</div>
+    </div>`;
+  }
+
+  function wireBatchRow(el) {
+    const d = batchDrafts.find((x) => x.id === el.dataset.id);
+    if (!d) return;
+    const catSel = el.querySelector('.draft-cat');
+    const supInp = el.querySelector('.draft-sup');
+    const amtInp = el.querySelector('.draft-amt');
+    catSel.onchange = () => {
+      d.categoryId = catSel.value;
+      el.querySelector('datalist').innerHTML = supplierOptionsFor(d.categoryId);
+      el.classList.remove('invalid');
+    };
+    supInp.oninput = () => { d.supplier = supInp.value; };
+    amtInp.oninput = () => { d.amount = amtInp.value; el.classList.remove('invalid'); };
+    el.querySelector('.draft-del').onclick = () => removeDraft(d.id);
+  }
+
+  function renderBatch() {
+    $('#batchCount').textContent = batchDrafts.length ? `共 ${batchDrafts.length} 張` : '';
+    const list = $('#batchList');
+    if (!batchDrafts.length) {
+      list.innerHTML = '<div class="empty">還沒有相片。<br>按上面「連拍」或「多選」加入單據。</div>';
+      $('#btnBatchSaveAll').hidden = true;
+      return;
+    }
+    list.innerHTML = batchDrafts.map(draftRowHTML).join('');
+    $$('#batchList .draft').forEach(wireBatchRow);
+    $('#btnBatchSaveAll').hidden = false;
+    $('#btnBatchSaveAll').textContent = `✓ 全部儲存（${batchDrafts.length} 張）`;
+  }
+
+  // 只更新某一列的值與狀態（不重建整張清單，避免打斷其他列打字）
+  function refreshDraftRow(d) {
+    const el = $(`#batchList .draft[data-id="${d.id}"]`);
+    if (!el) return;
+    const catSel = el.querySelector('.draft-cat');
+    const supInp = el.querySelector('.draft-sup');
+    const amtInp = el.querySelector('.draft-amt');
+    if (!catSel.value && d.categoryId) {
+      catSel.value = d.categoryId;
+      el.querySelector('datalist').innerHTML = supplierOptionsFor(d.categoryId);
+    }
+    if (!supInp.value && d.supplier) supInp.value = d.supplier;
+    if (!amtInp.value && d.amount) amtInp.value = d.amount;
+    const stEl = el.querySelector('.draft-status');
+    stEl.textContent = d.statusText;
+    stEl.className = 'draft-status' + (d.status === 'done' ? ' done' : d.status === 'err' ? ' err' : '');
+  }
+
+  function removeDraft(id) {
+    const i = batchDrafts.findIndex((x) => x.id === id);
+    if (i < 0) return;
+    if (batchDrafts[i].thumbURL) URL.revokeObjectURL(batchDrafts[i].thumbURL);
+    batchDrafts.splice(i, 1);
+    renderBatch();
+  }
+
+  async function addBatchPhotos(files) {
+    const incoming = Array.from(files || []);
+    if (!incoming.length) return;
+    const room = 20 - batchDrafts.length;
+    if (room <= 0) { alert('最多 20 張，請先儲存或刪掉一些'); return; }
+    if (incoming.length > room) { alert(`最多 20 張，這次只加前 ${room} 張`); incoming.length = room; }
+
+    const list = $('#batchList');
+    if (list.querySelector('.empty')) list.innerHTML = '';
+    for (const f of incoming) {
+      const blob = await compressImage(f);
+      const d = {
+        id: genId(), blob, thumbURL: URL.createObjectURL(blob),
+        categoryId: '', supplier: '', amount: '', date: todayISO(),
+        status: 'queued', statusText: '排隊辨識中…',
+      };
+      batchDrafts.push(d);
+      ocrQueue.push(d.id);
+      list.insertAdjacentHTML('beforeend', draftRowHTML(d));
+      wireBatchRow(list.querySelector(`.draft[data-id="${d.id}"]`));
+    }
+    $('#batchCount').textContent = `共 ${batchDrafts.length} 張`;
+    $('#btnBatchSaveAll').hidden = false;
+    $('#btnBatchSaveAll').textContent = `✓ 全部儲存（${batchDrafts.length} 張）`;
+    runBatchOCR();
+  }
+
+  // 逐張辨識（Tesseract 慢，排隊一張一張跑，不阻塞使用者編輯）
+  async function runBatchOCR() {
+    if (ocrBusy) return;
+    ocrBusy = true;
+    while (ocrQueue.length) {
+      const id = ocrQueue.shift();
+      const d = batchDrafts.find((x) => x.id === id);
+      if (!d) continue;
+      d.status = 'ocr'; d.statusText = '辨識中…';
+      refreshDraftRow(d);
+      try {
+        const text = await OCR.recognize(d.blob);
+        const got = OCR.parse(text);
+        const known = matchKnownSupplier(text);
+        if (known && !d.categoryId) { d.categoryId = known.cat; if (!d.supplier) d.supplier = known.supplier; }
+        if (got.amount && d.amount === '') d.amount = String(got.amount);
+        if (got.date && plausibleDate(got.date)) d.date = got.date;
+        if (!known && got.supplier && !d.supplier && d.categoryId) d.supplier = got.supplier;
+        d.status = 'done';
+        d.statusText = d.categoryId ? '✓ 已辨識，請核對'
+          : d.amount ? '只讀到金額，請選種類'
+          : '讀不太到，請自己選種類/填金額';
+      } catch (err) {
+        d.status = 'err'; d.statusText = '辨識失敗，請手動填';
+      }
+      refreshDraftRow(d);
+    }
+    ocrBusy = false;
+  }
+
+  async function saveAllBatch() {
+    if (!batchDrafts.length) return;
+    const invalid = [];
+    for (const d of batchDrafts) {
+      const amt = Math.round((parseFloat(d.amount) || 0) * 100) / 100;
+      if (!d.categoryId || amt <= 0) invalid.push(d.id);
+    }
+    if (invalid.length) {
+      $$('#batchList .draft').forEach((el) => el.classList.toggle('invalid', invalid.includes(el.dataset.id)));
+      alert(`有 ${invalid.length} 張未填「種類」或「金額」（已用紅框標出），請補齊或刪掉再存。`);
+      return;
+    }
+    const toSave = [...batchDrafts];
+    for (let i = 0; i < toSave.length; i++) {
+      const d = toSave[i];
+      const amount = Math.round((parseFloat(d.amount) || 0) * 100) / 100;
+      const supplier = (d.supplier || '').trim();
+      const rec = {
+        id: genId(), amount, categoryId: d.categoryId, supplier, employee: '',
+        wage: null, hours: null,
+        date: (d.date && plausibleDate(d.date)) ? d.date : todayISO(),
+        note: '', hasPhoto: !!d.blob, createdAt: Date.now() + i, synced: false,
+      };
+      await DB.put('receipts', rec);
+      if (d.blob) await DB.put('photos', { receiptId: rec.id, blob: d.blob });
+      if (supplier) { suppliersMap[supplier] = d.categoryId; await DB.put('suppliers', { name: supplier, categoryId: d.categoryId }); }
+    }
+    const n = toSave.length;
+    clearBatch();
+    await reload();
+    show('list');
+    renderList();
+    alert(`已儲存 ${n} 張`);
+  }
+
   // ---- 載入 ----
   async function reload() {
     receipts = await DB.getAll('receipts');
@@ -433,6 +629,15 @@
     $('#sumNext').onclick = () => { shiftAnchor(1); renderSummary(); };
     $('#fab').onclick = () => openAdd(null);
     $('#addCancel').onclick = () => { clearPhotoUI(); show('home'); renderHome(); };
+
+    // 批次入單
+    $('#btnBatch').onclick = () => { clearPhotoUI(); openBatch(); };
+    $('#batchCancel').onclick = () => { clearBatch(); show('home'); renderHome(); };
+    $('#btnBatchCam').onclick = () => $('#fileBatchCam').click();
+    $('#btnBatchAlbum').onclick = () => $('#fileBatchAlbum').click();
+    $('#fileBatchCam').onchange = (e) => { addBatchPhotos(e.target.files); e.target.value = ''; };
+    $('#fileBatchAlbum').onchange = (e) => { addBatchPhotos(e.target.files); e.target.value = ''; };
+    $('#btnBatchSaveAll').onclick = saveAllBatch;
 
     // 模式切換：掃描 = 直接拍照
     $$('#modeSeg div').forEach((d) => {
