@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <title>餐廳記帳</title>
-<link rel="stylesheet" href="styles.css?v=3">
+<link rel="stylesheet" href="styles.css?v=4">
 </head>
 <body>
   <div id="app">
@@ -86,10 +86,12 @@
           <input type="file" id="fileAlbum" accept="image/*" hidden>
         </div>
 
-        <!-- 金額 -->
-        <div class="amt-row" id="amountRow">
-          <span class="muted">金額</span>
-          <input id="fAmount" class="amt-input" inputmode="decimal" placeholder="0.00">
+        <!-- 供應商（先選供應商，會自動帶種類） -->
+        <div id="supplierBox">
+          <div class="muted sec-label">供應商名稱</div>
+          <input id="fSupplier" class="text-input" list="supplierList" placeholder="例：港聯、李光記…" autocomplete="off">
+          <datalist id="supplierList"></datalist>
+          <div class="muted hint" id="supplierHint"></div>
         </div>
 
         <!-- 種類 -->
@@ -110,12 +112,10 @@
           <input id="fEmployee" class="text-input" placeholder="例：阿強">
         </div>
 
-        <!-- 供應商 -->
-        <div id="supplierBox">
-          <div class="muted sec-label">供應商名稱</div>
-          <input id="fSupplier" class="text-input" list="supplierList" placeholder="例：美心蔬果行" autocomplete="off">
-          <datalist id="supplierList"></datalist>
-          <div class="muted hint" id="supplierHint"></div>
+        <!-- 金額 -->
+        <div class="amt-row" id="amountRow">
+          <span class="muted">金額</span>
+          <input id="fAmount" class="amt-input" inputmode="decimal" placeholder="0.00">
         </div>
 
         <!-- 日期 + 備註 -->
@@ -140,9 +140,9 @@
 
   </div>
 
-  <script src="db.js?v=3"></script>
-  <script src="classify.js?v=3"></script>
-  <script src="ocr.js?v=3"></script>
-  <script src="app.js?v=3"></script>
+  <script src="db.js?v=4"></script>
+  <script src="classify.js?v=4"></script>
+  <script src="ocr.js?v=4"></script>
+  <script src="app.js?v=4"></script>
 </body>
 </html>
