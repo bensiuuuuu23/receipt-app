@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <title>餐廳記帳</title>
-<link rel="stylesheet" href="styles.css?v=6">
+<link rel="stylesheet" href="styles.css?v=7">
 </head>
 <body>
   <div id="app">
@@ -86,6 +86,8 @@
           <input type="file" id="fileAlbum" accept="image/*" hidden>
         </div>
 
+        <button class="btn ghost" id="btnBatch" style="margin-top:10px">📚 一次入多張（連拍 / 多選）</button>
+
         <!-- 種類（先選種類，供應商欄只顯示這類的店） -->
         <div class="muted sec-label">種類</div>
         <div class="cat-grid" id="catGrid"></div>
@@ -129,6 +131,26 @@
       </div>
     </section>
 
+    <!-- 批次入單 -->
+    <section class="screen sheet" data-screen="batch" hidden>
+      <header class="hd">
+        <button class="hd-back" id="batchCancel">✕</button>
+        <div class="hd-title">批次入單</div>
+        <div class="hd-sub" id="batchCount"></div>
+      </header>
+      <div class="content">
+        <div class="photo-actions">
+          <button class="btn ghost photo-btn" id="btnBatchCam">📷 連拍</button>
+          <button class="btn ghost photo-btn" id="btnBatchAlbum">🖼 多選</button>
+        </div>
+        <div class="muted hint" id="batchHint">拍或選多張單據（最多 20 張），會逐張自動辨識，下面每列都可即時改。</div>
+        <div id="batchList"></div>
+        <button class="btn" id="btnBatchSaveAll" hidden>✓ 全部儲存</button>
+        <input type="file" id="fileBatchCam" accept="image/*" capture="environment" hidden>
+        <input type="file" id="fileBatchAlbum" accept="image/*" multiple hidden>
+      </div>
+    </section>
+
     <!-- 底部分頁 -->
     <nav class="tabbar">
       <div class="tab on" data-go="home"><i>🏠</i>首頁</div>
@@ -140,9 +162,9 @@
 
   </div>
 
-  <script src="db.js?v=6"></script>
-  <script src="classify.js?v=6"></script>
-  <script src="ocr.js?v=6"></script>
-  <script src="app.js?v=6"></script>
+  <script src="db.js?v=7"></script>
+  <script src="classify.js?v=7"></script>
+  <script src="ocr.js?v=7"></script>
+  <script src="app.js?v=7"></script>
 </body>
 </html>
