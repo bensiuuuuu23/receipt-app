@@ -170,6 +170,8 @@
     $('#laborBox').hidden = !labor;
     $('#supplierBox').hidden = labor;
     $('#amountRow').hidden = labor; // 人工的金額用時薪×工時自動算
+    // 選了種類才更新「這個種類的供應商」清單與提示
+    if (!labor) { refreshSupplierList(); updateSupplierHint($('#fSupplier').value.trim()); }
   }
 
   function computeLabor() {
@@ -179,30 +181,33 @@
     return w * h;
   }
 
+  // 某種類底下的供應商（內建 + 使用者記過的）
+  function suppliersForCat(catId) {
+    if (!catId) return [];
+    const set = new Set();
+    for (const [name, cid] of Object.entries(DEFAULT_SUPPLIER_MAP)) if (cid === catId) set.add(name);
+    for (const [name, cid] of Object.entries(suppliersMap)) if (cid === catId) set.add(name);
+    return Array.from(set).sort();
+  }
+
+  // 供應商自動補全清單：只列出目前所選種類的供應商
   function refreshSupplierList() {
-    // 內建常用供應商 + 使用者記過的供應商，一起做自動補全
-    const names = Array.from(new Set([
-      ...Object.keys(DEFAULT_SUPPLIER_MAP),
-      ...Object.keys(suppliersMap),
-    ])).sort();
+    const names = suppliersForCat(selectedCat);
     $('#supplierList').innerHTML = names.map((n) => `<option value="${esc(n)}">`).join('');
   }
 
   function onSupplierInput() {
-    const name = $('#fSupplier').value.trim();
-    if (manualCatOverride) { updateSupplierHint(name); return; }
-    const guess = autoClassify(name, suppliersMap);
-    if (guess) setCat(guess);
-    updateSupplierHint(name);
+    // 種類先選，供應商不再回頭改種類，只更新提示
+    updateSupplierHint($('#fSupplier').value.trim());
   }
 
   function updateSupplierHint(name) {
     const hint = $('#supplierHint');
-    if (!name) { hint.textContent = ''; return; }
-    if (suppliersMap[name]) hint.textContent = `記得這家 → ${catOf(suppliersMap[name]).name}`;
-    else if (DEFAULT_SUPPLIER_MAP[name]) hint.textContent = `常用供應商 → ${catOf(DEFAULT_SUPPLIER_MAP[name]).name}`;
-    else if (keywordGuess(name)) hint.textContent = `猜：${catOf(keywordGuess(name)).name}（可改）`;
-    else hint.textContent = '新供應商，請選種類（下次會自動記住）';
+    if (!selectedCat || selectedCat === 'labor') { hint.textContent = ''; return; }
+    const known = suppliersForCat(selectedCat);
+    if (!name) { hint.textContent = known.length ? '選擇或輸入供應商' : '輸入供應商（會記住這類）'; return; }
+    if (known.includes(name)) hint.textContent = '';
+    else hint.textContent = `新供應商，會記到「${catOf(selectedCat).name}」`;
   }
 
   // ---- 照片 / OCR ----
@@ -305,7 +310,7 @@
     if (r) manualCatOverride = true; // 編輯時不自動覆蓋既有分類
     renderCatGrid();
     setCat(selectedCat || 'food');
-    if (!r) { selectedCat = null; renderCatGrid(); $('#laborBox').hidden = true; $('#supplierBox').hidden = false; $('#amountRow').hidden = false; }
+    if (!r) { selectedCat = null; renderCatGrid(); $('#laborBox').hidden = true; $('#supplierBox').hidden = true; $('#amountRow').hidden = true; }
     computeLabor();
     refreshSupplierList();
     updateSupplierHint($('#fSupplier').value.trim());
