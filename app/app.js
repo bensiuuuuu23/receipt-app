@@ -398,6 +398,7 @@
     await reload();
     show('list');
     renderList();
+    syncNow();
   }
 
   async function del() {
@@ -600,7 +601,48 @@
     await reload();
     show('list');
     renderList();
+    syncNow();
     alert(`已儲存 ${n} 張`);
+  }
+
+  // ---- 雲端同步 ----
+  let syncing = false;
+
+  function updateSyncStatus(text) { const el = $('#syncStatus'); if (el) el.textContent = text; }
+
+  function updateSyncState() {
+    const el = $('#syncState'); if (!el) return;
+    if (!Sync.isConfigured()) { el.textContent = '尚未設定（照教學建好 Apps Script，把網址和 Token 貼下面）'; return; }
+    const pending = receipts.filter((r) => !r.synced).length;
+    el.textContent = pending ? `已設定 · 尚有 ${pending} 筆待上傳` : '已設定 · 全部已同步 ✓';
+  }
+
+  // 本機先存、有網再把未同步的逐筆送上雲（含照片）
+  async function syncNow(manual) {
+    if (syncing) return;
+    if (!Sync.isConfigured()) { if (manual) updateSyncStatus('請先填網址與 Token 並儲存'); return; }
+    if (!navigator.onLine) { if (manual) updateSyncStatus('目前離線，等有網再同步'); return; }
+    const pending = receipts.filter((r) => !r.synced);
+    if (!pending.length) { updateSyncStatus('全部已同步 ✓'); updateSyncState(); return; }
+    syncing = true;
+    let done = 0, fail = 0;
+    updateSyncStatus(`同步中… 0/${pending.length}`);
+    for (const r of pending) {
+      try {
+        let blob = null;
+        if (r.hasPhoto) { const p = await DB.get('photos', r.id); blob = p && p.blob; }
+        await Sync.pushReceipt({ ...r, categoryName: catOf(r.categoryId).name }, blob);
+        r.synced = true;
+        await DB.put('receipts', r);
+        done++;
+      } catch (err) {
+        fail++;
+      }
+      updateSyncStatus(`同步中… ${done + fail}/${pending.length}${fail ? `（失敗 ${fail}）` : ''}`);
+    }
+    syncing = false;
+    updateSyncStatus(fail ? `完成 ${done} 筆，${fail} 筆失敗，稍後自動再試` : `已全部同步（${done} 筆）✓`);
+    updateSyncState();
   }
 
   // ---- 載入 ----
@@ -620,6 +662,7 @@
         if (g === 'home') renderHome();
         if (g === 'list') renderList();
         if (g === 'summary') renderSummary();
+        if (g === 'settings') updateSyncState();
       };
     });
     $$('#sumSeg div').forEach((el) => {
@@ -660,6 +703,26 @@
     $('#fWage').oninput = computeLabor;
     $('#fHours').oninput = computeLabor;
     $('#fSupplier').oninput = onSupplierInput;
+    // 雲端同步設定
+    const cfg = Sync.getConfig();
+    $('#fSyncUrl').value = cfg.url || '';
+    $('#fSyncToken').value = cfg.token || '';
+    updateSyncState();
+    $('#btnSyncSave').onclick = () => {
+      Sync.setConfig($('#fSyncUrl').value, $('#fSyncToken').value);
+      updateSyncState();
+      updateSyncStatus('已儲存，開始同步…');
+      syncNow(true);
+    };
+    $('#btnSyncTest').onclick = async () => {
+      Sync.setConfig($('#fSyncUrl').value, $('#fSyncToken').value); // 先存目前輸入再測
+      updateSyncStatus('測試中…');
+      try { await Sync.test(); updateSyncStatus('✓ 連線成功，可以儲存了'); updateSyncState(); }
+      catch (err) { updateSyncStatus('✗ ' + (err.message || err)); }
+    };
+    $('#btnSyncNow').onclick = () => syncNow(true);
+    window.addEventListener('online', () => syncNow());
+
     $('#btnClearAll').onclick = async () => {
       if (!confirm('清空所有單據、照片與供應商記憶？此動作不可還原（雲端同步後會以雲端為準）。')) return;
       await DB.clear('receipts');
@@ -677,5 +740,7 @@
     bind();
     await reload();
     show('home');
+    updateSyncState();
+    syncNow(); // 開 App 就把上次沒傳完的補傳
   })();
 })();
