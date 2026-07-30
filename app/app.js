@@ -346,6 +346,7 @@
     if (r && r.hasPhoto) {
       const p = await DB.get('photos', r.id);
       if (p && p.blob) { pendingPhoto = p.blob; photoChanged = false; setPhotoPreview(p.blob); }
+      else if (r.photoUrl) { $('#ocrStatus').innerHTML = `📎 這張照片在雲端：<a href="${esc(r.photoUrl)}" target="_blank" rel="noopener" style="color:var(--accent)">在 Drive 開啟</a>`; }
     }
 
     show('add');
@@ -370,6 +371,9 @@
 
     const supplier = labor ? '' : $('#fSupplier').value.trim();
     const employee = labor ? $('#fEmployee').value.trim() : '';
+    const existing = editingId ? receipts.find((x) => x.id === editingId) : null;
+    // 照片旗標：有新照片=有；按過移除=無；沒動過=沿用原本（保住雲端下載回來的照片連結）
+    const hasPhoto = pendingPhoto ? true : (photoChanged ? false : !!(existing && existing.hasPhoto));
 
     const rec = {
       id: editingId || genId(),
@@ -381,8 +385,9 @@
       hours: labor ? (parseFloat($('#fHours').value) || 0) : null,
       date: $('#fDate').value || todayISO(),
       note: $('#fNote').value.trim(),
-      hasPhoto: !!pendingPhoto,
-      createdAt: editingId ? (receipts.find((x) => x.id === editingId)?.createdAt || Date.now()) : Date.now(),
+      hasPhoto,
+      photoUrl: (existing && existing.photoUrl) || '',
+      createdAt: editingId ? (existing?.createdAt || Date.now()) : Date.now(),
       synced: false,
     };
 
@@ -404,11 +409,14 @@
   async function del() {
     if (!editingId) return;
     if (!confirm('確定刪除這張單據？')) return;
-    await DB.remove('receipts', editingId);
-    await DB.remove('photos', editingId);
+    // 軟刪除（墓碑）：標記已刪 + 待同步，這樣刪除才能同步到其他裝置
+    const rec = (receipts.find((x) => x.id === editingId)) || (await DB.get('receipts', editingId));
+    if (rec) { rec.deleted = true; rec.synced = false; await DB.put('receipts', rec); }
+    await DB.remove('photos', editingId); // 本機照片可清（雲端保留連結）
     await reload();
     show('list');
     renderList();
+    syncNow();
   }
 
   // ---- 批次入單 ----
@@ -617,37 +625,78 @@
     el.textContent = pending ? `已設定 · 尚有 ${pending} 筆待上傳` : '已設定 · 全部已同步 ✓';
   }
 
-  // 本機先存、有網再把未同步的逐筆送上雲（含照片）
+  function nameToCatId(name) { const c = CATEGORIES.find((x) => x.name === name); return c ? c.id : null; }
+
+  // 雲端一筆 → 本機單據格式
+  function srvToRec(s) {
+    return {
+      id: String(s.id), amount: Number(s.amount) || 0,
+      categoryId: s.categoryId || nameToCatId(s.categoryName) || 'other',
+      supplier: s.supplier || '', employee: s.employee || '', wage: null, hours: null,
+      date: s.date || todayISO(), note: s.note || '',
+      hasPhoto: !!s.photoUrl, photoUrl: s.photoUrl || '',
+      createdAt: Number(s.createdAt) || Date.now(), synced: true,
+    };
+  }
+
+  // 雙向同步：先把本機未同步的（含刪除記號）上傳，再把雲端全部抓回合併
   async function syncNow(manual) {
     if (syncing) return;
     if (!Sync.isConfigured()) { if (manual) updateSyncStatus('請先填網址與 Token 並儲存'); return; }
     if (!navigator.onLine) { if (manual) updateSyncStatus('目前離線，等有網再同步'); return; }
-    const pending = receipts.filter((r) => !r.synced);
-    if (!pending.length) { updateSyncStatus('全部已同步 ✓'); updateSyncState(); return; }
     syncing = true;
-    let done = 0, fail = 0;
-    updateSyncStatus(`同步中… 0/${pending.length}`);
-    for (const r of pending) {
-      try {
-        let blob = null;
-        if (r.hasPhoto) { const p = await DB.get('photos', r.id); blob = p && p.blob; }
-        await Sync.pushReceipt({ ...r, categoryName: catOf(r.categoryId).name }, blob);
-        r.synced = true;
-        await DB.put('receipts', r);
-        done++;
-      } catch (err) {
-        fail++;
+    let done = 0, fail = 0, pulled = 0, removed = 0;
+    try {
+      // 1) 上傳
+      const all = await DB.getAll('receipts');
+      const pending = all.filter((r) => !r.synced);
+      if (pending.length) updateSyncStatus(`上傳中… 0/${pending.length}`);
+      for (const r of pending) {
+        try {
+          let blob = null;
+          if (r.hasPhoto && !r.deleted) { const p = await DB.get('photos', r.id); blob = p && p.blob; }
+          await Sync.pushReceipt({ ...r, categoryName: catOf(r.categoryId).name }, blob);
+          r.synced = true;
+          await DB.put('receipts', r);
+          done++;
+        } catch (e) { fail++; }
+        updateSyncStatus(`上傳中… ${done + fail}/${pending.length}${fail ? `（失敗 ${fail}）` : ''}`);
       }
-      updateSyncStatus(`同步中… ${done + fail}/${pending.length}${fail ? `（失敗 ${fail}）` : ''}`);
+      // 2) 下載合併
+      updateSyncStatus('下載中…');
+      const res = await Sync.pull();
+      const server = (res && res.receipts) || [];
+      for (const s of server) {
+        const local = await DB.get('receipts', String(s.id));
+        if (s.deleted) {
+          // 雲端已刪 → 本機也移除（除非本機有未上傳的更動）
+          if (local && local.synced !== false) { await DB.remove('receipts', String(s.id)); await DB.remove('photos', String(s.id)); removed++; }
+          continue;
+        }
+        if (!local) { await DB.put('receipts', srvToRec(s)); pulled++; }
+        else if (local.synced) { await DB.put('receipts', srvToRec(s)); pulled++; } // 本機無待傳更動 → 以雲端為準
+        // else：本機有未上傳更動 → 保留本機，下次上傳
+      }
+    } catch (e) {
+      syncing = false;
+      updateSyncStatus('同步中斷：' + (e.message || e));
+      return;
     }
+    await reload();
+    renderList();
     syncing = false;
-    updateSyncStatus(fail ? `完成 ${done} 筆，${fail} 筆失敗，稍後自動再試` : `已全部同步（${done} 筆）✓`);
+    const bits = [];
+    if (pulled) bits.push(`下載 ${pulled}`);
+    if (removed) bits.push(`移除 ${removed}`);
+    if (fail) bits.push(`${fail} 筆上傳失敗`);
+    updateSyncStatus((fail ? '完成（部分失敗，稍後再試）' : '同步完成 ✓') + (bits.length ? `（${bits.join('、')}）` : ''));
     updateSyncState();
   }
 
   // ---- 載入 ----
   async function reload() {
-    receipts = await DB.getAll('receipts');
+    const all = await DB.getAll('receipts');
+    receipts = all.filter((r) => !r.deleted); // 已刪除的墓碑不顯示（仍留 DB 等同步）
     const sup = await DB.getAll('suppliers');
     suppliersMap = Object.fromEntries(sup.map((s) => [s.name, s.categoryId]));
     renderHome();
