@@ -35,6 +35,11 @@ const Sync = (() => {
     return post({ token: getConfig().token, action: 'ping' });
   }
 
+  // 下載雲端全部單據（含已刪除記號），供本機合併
+  function pull() {
+    return post({ token: getConfig().token, action: 'list' });
+  }
+
   // 同步一筆（含照片 base64）；receipt 需含 categoryName
   async function pushReceipt(receipt, photoBlob) {
     let photoBase64 = null, photoMime = null;
@@ -54,5 +59,5 @@ const Sync = (() => {
     });
   }
 
-  return { getConfig, setConfig, isConfigured, test, pushReceipt };
+  return { getConfig, setConfig, isConfigured, test, pull, pushReceipt };
 })();
