@@ -18,7 +18,7 @@ function catOf(id) { return CAT_MAP[id] || CAT_MAP['other']; }
 /* 內建供應商對應表：選了這些常用供應商就自動帶對應種類（仍可手動改） */
 const DEFAULT_SUPPLIER_MAP = {
   // 食材
-  '自購食材': 'food', '港聯': 'food', '唐順興': 'food',
+  '自購食材': 'food', '港聯': 'food', '唐順興': 'food', '潤富': 'food',
   // 廚房小件
   '李光記': 'kitchen', '陳枝記': 'kitchen', '恆盛': 'kitchen', '沈華記': 'kitchen', '光榮': 'kitchen',
   // 交通
