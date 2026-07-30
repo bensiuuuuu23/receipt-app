@@ -62,7 +62,7 @@ function listAll() {
   const vals = sh.getRange(2, 1, last - 1, HEADERS.length).getValues();
   return vals.map(function (r) {
     return {
-      id: String(r[0]), date: toDateStr(r[1]), categoryName: r[2], categoryId: r[3],
+      id: String(r[0]), date: dateStr(r[1]), categoryName: r[2], categoryId: r[3],
       supplier: r[4], amount: Number(r[5]) || 0, employee: r[6], note: r[7],
       photoUrl: r[8], deleted: r[9] === '已刪除', createdAt: r[10],
     };
@@ -75,7 +75,7 @@ function upsertRow(r, photoUrl) {
   const last = sh.getLastRow();
   const ids = last > 1 ? sh.getRange(2, 1, last - 1, 1).getValues().map(function (x) { return String(x[0]); }) : [];
   const row = [
-    r.id, r.date || '', r.categoryName || r.categoryId || '', r.categoryId || '', r.supplier || '',
+    r.id, dateStr(r.date), r.categoryName || r.categoryId || '', r.categoryId || '', r.supplier || '',
     Number(r.amount) || 0, r.employee || '', r.note || '', photoUrl || '', r.deleted ? '已刪除' : '',
     r.createdAt || '', new Date(),
   ];
@@ -108,9 +108,16 @@ function getFolder() {
   return it.hasNext() ? it.next() : DriveApp.createFolder(PHOTO_FOLDER);
 }
 
-function toDateStr(v) {
-  if (v instanceof Date) return Utilities.formatDate(v, 'Asia/Taipei', 'yyyy-MM-dd');
-  return String(v || '');
+// 一律轉成乾淨的 yyyy-MM-dd 文字（不管來的是 Date 物件或字串）
+function dateStr(v) {
+  if (!v) return '';
+  if (Object.prototype.toString.call(v) === '[object Date]') return Utilities.formatDate(v, 'Asia/Taipei', 'yyyy-MM-dd');
+  var s = String(v);
+  var m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return m[1] + '-' + m[2] + '-' + m[3];
+  var d = new Date(s);
+  if (!isNaN(d.getTime())) return Utilities.formatDate(d, 'Asia/Taipei', 'yyyy-MM-dd');
+  return s;
 }
 
 function json(obj) {

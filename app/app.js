@@ -627,13 +627,27 @@
 
   function nameToCatId(name) { const c = CATEGORIES.find((x) => x.name === name); return c ? c.id : null; }
 
+  // 把雲端回來的日期一律正規化成 YYYY-MM-DD（Google Sheet 有時會回一長串 Date 文字）
+  function normalizeDate(v) {
+    if (!v) return todayISO();
+    const s = String(v).trim();
+    const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+    const d = new Date(s);
+    if (!isNaN(d.getTime())) {
+      const y = d.getFullYear(), mo = String(d.getMonth() + 1).padStart(2, '0'), da = String(d.getDate()).padStart(2, '0');
+      return `${y}-${mo}-${da}`;
+    }
+    return todayISO();
+  }
+
   // 雲端一筆 → 本機單據格式
   function srvToRec(s) {
     return {
       id: String(s.id), amount: Number(s.amount) || 0,
       categoryId: s.categoryId || nameToCatId(s.categoryName) || 'other',
       supplier: s.supplier || '', employee: s.employee || '', wage: null, hours: null,
-      date: s.date || todayISO(), note: s.note || '',
+      date: normalizeDate(s.date), note: s.note || '',
       hasPhoto: !!s.photoUrl, photoUrl: s.photoUrl || '',
       createdAt: Number(s.createdAt) || Date.now(), synced: true,
     };
