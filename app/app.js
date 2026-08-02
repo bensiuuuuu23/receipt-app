@@ -173,8 +173,8 @@
     $('#laborBox').hidden = !labor;
     $('#supplierBox').hidden = labor;
     $('#amountRow').hidden = labor; // 人工的金額用時薪×工時自動算
-    // 選了種類才更新「這個種類的供應商」清單與提示
-    if (!labor) { refreshSupplierList(); updateSupplierHint($('#fSupplier').value.trim()); }
+    // 選了種類才更新「這個種類的供應商」下拉（換種類就清空選擇）
+    if (!labor) { renderSupplierSelect(''); updateSupplierHint(); }
   }
 
   function computeLabor() {
@@ -193,10 +193,38 @@
     return Array.from(set).sort();
   }
 
-  // 供應商自動補全清單：只列出目前所選種類的供應商
-  function refreshSupplierList() {
+  // 供應商下拉：只列目前所選種類的供應商，最後放「＋ 新增供應商」
+  function renderSupplierSelect(keepVal) {
+    const sel = $('#fSupplierSel');
+    const cur = keepVal != null ? keepVal : (sel.value === '__new__' ? '' : sel.value);
     const names = suppliersForCat(selectedCat);
-    $('#supplierList').innerHTML = names.map((n) => `<option value="${esc(n)}">`).join('');
+    let opts = '<option value="">— 選擇供應商 —</option>';
+    if (cur && !names.includes(cur)) opts += `<option value="${esc(cur)}">${esc(cur)}</option>`;
+    opts += names.map((n) => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
+    opts += '<option value="__new__">＋ 新增供應商…</option>';
+    sel.innerHTML = opts;
+    sel.value = cur && [...sel.options].some((o) => o.value === cur) ? cur : '';
+    $('#fSupplierNew').hidden = true;
+    $('#fSupplierNew').value = '';
+  }
+
+  // 設定供應商下拉的值（清單沒有就插一個），OCR / 編輯載入時用
+  function setSupplierValue(name) {
+    const sel = $('#fSupplierSel');
+    if (name && ![...sel.options].some((o) => o.value === name)) {
+      const opt = document.createElement('option');
+      opt.value = name; opt.textContent = name;
+      sel.insertBefore(opt, sel.querySelector('option[value="__new__"]'));
+    }
+    sel.value = name || '';
+    $('#fSupplierNew').hidden = true;
+    updateSupplierHint();
+  }
+
+  // 目前選定的供應商（含「新增」輸入框）
+  function currentSupplier() {
+    const v = $('#fSupplierSel').value;
+    return v === '__new__' ? $('#fSupplierNew').value.trim() : v;
   }
 
   // 拍照 OCR 用：整段文字裡若出現已知供應商名（記過的優先、長名優先）就命中
@@ -212,18 +240,19 @@
     return null;
   }
 
-  function onSupplierInput() {
-    // 種類先選，供應商不再回頭改種類，只更新提示
-    updateSupplierHint($('#fSupplier').value.trim());
+  function onSupplierSelChange() {
+    const v = $('#fSupplierSel').value;
+    const newBox = $('#fSupplierNew');
+    if (v === '__new__') { newBox.hidden = false; newBox.focus(); }
+    else { newBox.hidden = true; }
+    updateSupplierHint();
   }
 
-  function updateSupplierHint(name) {
+  function updateSupplierHint() {
     const hint = $('#supplierHint');
     if (!selectedCat || selectedCat === 'labor') { hint.textContent = ''; return; }
-    const known = suppliersForCat(selectedCat);
-    if (!name) { hint.textContent = known.length ? '選擇或輸入供應商' : '輸入供應商（會記住這類）'; return; }
-    if (known.includes(name)) hint.textContent = '';
-    else hint.textContent = `新供應商，會記到「${catOf(selectedCat).name}」`;
+    hint.textContent = ($('#fSupplierSel').value === '__new__')
+      ? `新供應商，會記到「${catOf(selectedCat).name}」` : '';
   }
 
   // ---- 照片 / OCR ----
@@ -290,7 +319,7 @@
       const known = matchKnownSupplier(text);
       if (known && !manualCatOverride && selectedCat !== 'labor') {
         setCat(known.cat); // 展開供應商/金額欄、篩該類供應商
-        if (!$('#fSupplier').value.trim()) { $('#fSupplier').value = known.supplier; onSupplierInput(); }
+        if (!currentSupplier()) setSupplierValue(known.supplier);
         filled.push(`種類（${catOf(known.cat).name}）`, `供應商（${known.supplier}）`);
       }
 
@@ -302,8 +331,8 @@
         else dateWarn = true; // 保留今天（預設）
       }
       // 沒認到已知供應商、但有選過種類 → 用 OCR 猜的店名填（標明是「猜」）
-      if (!known && got.supplier && selectedCat && selectedCat !== 'labor' && !$('#fSupplier').value.trim()) {
-        $('#fSupplier').value = got.supplier; onSupplierInput(); filled.push('店名（猜，請核對）');
+      if (!known && got.supplier && selectedCat && selectedCat !== 'labor' && !currentSupplier()) {
+        setSupplierValue(got.supplier); filled.push('店名（猜，請核對）');
       }
 
       let msg = filled.length ? `已自動填：${filled.join('、')} —— 請核對是否正確` : '讀不太到，請手動選種類';
@@ -320,7 +349,6 @@
     editingId = id || null;
     manualCatOverride = false;
     clearPhotoUI();
-    setMode('manual');
     const r = id ? receipts.find((x) => x.id === id) : null;
 
     $('#addTitle').textContent = r ? '編輯單據' : '新增單據';
@@ -330,7 +358,6 @@
     $('#fWage').value = r ? (r.wage ?? '') : '';
     $('#fHours').value = r ? (r.hours ?? '') : '';
     $('#fEmployee').value = r ? (r.employee ?? '') : '';
-    $('#fSupplier').value = r ? (r.supplier ?? '') : '';
     $('#fNote').value = r ? (r.note ?? '') : '';
     $('#fDate').value = r ? r.date : todayISO();
 
@@ -340,8 +367,7 @@
     setCat(selectedCat || 'food');
     if (!r) { selectedCat = null; renderCatGrid(); $('#laborBox').hidden = true; $('#supplierBox').hidden = true; $('#amountRow').hidden = true; }
     computeLabor();
-    refreshSupplierList();
-    updateSupplierHint($('#fSupplier').value.trim());
+    setSupplierValue(r ? (r.supplier || '') : '');
 
     if (r && r.hasPhoto) {
       const p = await DB.get('photos', r.id);
@@ -350,10 +376,6 @@
     }
 
     show('add');
-  }
-
-  function setMode(mode) {
-    $$('#modeSeg div').forEach((d) => d.classList.toggle('on', d.dataset.mode === mode));
   }
 
   async function save() {
@@ -369,7 +391,7 @@
       if (amount <= 0) { alert('請輸入金額'); return; }
     }
 
-    const supplier = labor ? '' : $('#fSupplier').value.trim();
+    const supplier = labor ? '' : currentSupplier();
     const employee = labor ? $('#fEmployee').value.trim() : '';
     const existing = editingId ? receipts.find((x) => x.id === editingId) : null;
     // 照片旗標：有新照片=有；按過移除=無；沒動過=沿用原本（保住雲端下載回來的照片連結）
@@ -442,12 +464,17 @@
     return opts.join('');
   }
 
-  function supplierOptionsFor(catId) {
-    return suppliersForCat(catId).map((n) => `<option value="${esc(n)}">`).join('');
+  // 批次供應商下拉：該種類的店 + 目前值 + 「＋ 新增」
+  function batchSupplierOptions(catId, cur) {
+    const names = suppliersForCat(catId);
+    let o = '<option value="">供應商…</option>';
+    if (cur && !names.includes(cur)) o += `<option value="${esc(cur)}" selected>${esc(cur)}</option>`;
+    o += names.map((n) => `<option value="${esc(n)}"${n === cur ? ' selected' : ''}>${esc(n)}</option>`).join('');
+    o += '<option value="__new__">＋ 新增</option>';
+    return o;
   }
 
   function draftRowHTML(d) {
-    const supListId = 'supList-' + d.id;
     const stCls = d.status === 'done' ? ' done' : d.status === 'err' ? ' err' : '';
     return `<div class="draft" data-id="${d.id}">
       <div class="draft-top">
@@ -455,10 +482,11 @@
         <select class="draft-cat">${batchCatOptions(d.categoryId)}</select>
         <button class="draft-del" title="刪除">🗑</button>
       </div>
+      <select class="text-input draft-sup">${batchSupplierOptions(d.categoryId, d.supplier)}</select>
+      <input class="text-input draft-sup-new" placeholder="新供應商名稱" autocomplete="off" hidden>
       <div class="draft-row2">
-        <input class="text-input draft-sup" list="${supListId}" placeholder="供應商" value="${esc(d.supplier)}">
-        <datalist id="${supListId}">${supplierOptionsFor(d.categoryId)}</datalist>
         <input class="text-input draft-amt" inputmode="decimal" placeholder="金額" value="${esc(d.amount)}">
+        <input class="text-input draft-date" type="date" value="${esc(d.date || '')}">
       </div>
       <div class="draft-status${stCls}">${esc(d.statusText)}</div>
     </div>`;
@@ -468,15 +496,24 @@
     const d = batchDrafts.find((x) => x.id === el.dataset.id);
     if (!d) return;
     const catSel = el.querySelector('.draft-cat');
-    const supInp = el.querySelector('.draft-sup');
+    const supSel = el.querySelector('.draft-sup');
+    const supNew = el.querySelector('.draft-sup-new');
     const amtInp = el.querySelector('.draft-amt');
+    const dateInp = el.querySelector('.draft-date');
     catSel.onchange = () => {
       d.categoryId = catSel.value;
-      el.querySelector('datalist').innerHTML = supplierOptionsFor(d.categoryId);
+      d.supplier = '';
+      supSel.innerHTML = batchSupplierOptions(d.categoryId, '');
+      supNew.hidden = true; supNew.value = '';
       el.classList.remove('invalid');
     };
-    supInp.oninput = () => { d.supplier = supInp.value; };
+    supSel.onchange = () => {
+      if (supSel.value === '__new__') { supNew.hidden = false; supNew.focus(); d.supplier = ''; }
+      else { supNew.hidden = true; d.supplier = supSel.value; }
+    };
+    supNew.oninput = () => { d.supplier = supNew.value; };
     amtInp.oninput = () => { d.amount = amtInp.value; el.classList.remove('invalid'); };
+    dateInp.oninput = () => { d.date = dateInp.value; d.dateTouched = true; };
     el.querySelector('.draft-del').onclick = () => removeDraft(d.id);
   }
 
@@ -499,14 +536,22 @@
     const el = $(`#batchList .draft[data-id="${d.id}"]`);
     if (!el) return;
     const catSel = el.querySelector('.draft-cat');
-    const supInp = el.querySelector('.draft-sup');
+    const supSel = el.querySelector('.draft-sup');
     const amtInp = el.querySelector('.draft-amt');
+    const dateInp = el.querySelector('.draft-date');
     if (!catSel.value && d.categoryId) {
       catSel.value = d.categoryId;
-      el.querySelector('datalist').innerHTML = supplierOptionsFor(d.categoryId);
+      supSel.innerHTML = batchSupplierOptions(d.categoryId, d.supplier);
     }
-    if (!supInp.value && d.supplier) supInp.value = d.supplier;
+    if (d.supplier && !supSel.value) {
+      if (![...supSel.options].some((o) => o.value === d.supplier)) {
+        const opt = document.createElement('option'); opt.value = d.supplier; opt.textContent = d.supplier;
+        supSel.insertBefore(opt, supSel.querySelector('option[value="__new__"]'));
+      }
+      supSel.value = d.supplier;
+    }
     if (!amtInp.value && d.amount) amtInp.value = d.amount;
+    if (!d.dateTouched && d.date) dateInp.value = d.date;
     const stEl = el.querySelector('.draft-status');
     stEl.textContent = d.statusText;
     stEl.className = 'draft-status' + (d.status === 'done' ? ' done' : d.status === 'err' ? ' err' : '');
@@ -533,7 +578,7 @@
       const blob = await compressImage(f);
       const d = {
         id: genId(), blob, thumbURL: URL.createObjectURL(blob),
-        categoryId: '', supplier: '', amount: '', date: todayISO(),
+        categoryId: '', supplier: '', amount: '', date: todayISO(), dateTouched: false,
         status: 'queued', statusText: '排隊辨識中…',
       };
       batchDrafts.push(d);
@@ -563,7 +608,7 @@
         const known = matchKnownSupplier(text);
         if (known && !d.categoryId) { d.categoryId = known.cat; if (!d.supplier) d.supplier = known.supplier; }
         if (got.amount && d.amount === '') d.amount = String(got.amount);
-        if (got.date && plausibleDate(got.date)) d.date = got.date;
+        if (got.date && plausibleDate(got.date) && !d.dateTouched) d.date = got.date;
         if (!known && got.supplier && !d.supplier && d.categoryId) d.supplier = got.supplier;
         d.status = 'done';
         d.statusText = d.categoryId ? '✓ 已辨識，請核對'
@@ -745,13 +790,6 @@
     $('#fileBatchAlbum').onchange = (e) => { addBatchPhotos(e.target.files); e.target.value = ''; };
     $('#btnBatchSaveAll').onclick = saveAllBatch;
 
-    // 模式切換：掃描 = 直接拍照
-    $$('#modeSeg div').forEach((d) => {
-      d.onclick = () => {
-        setMode(d.dataset.mode);
-        if (d.dataset.mode === 'scan') $('#fileCamera').click();
-      };
-    });
     // 拍照 / 選相
     $('#btnCamera').onclick = () => $('#fileCamera').click();
     $('#btnAlbum').onclick = () => $('#fileAlbum').click();
@@ -765,7 +803,8 @@
     $('#btnDelete').onclick = del;
     $('#fWage').oninput = computeLabor;
     $('#fHours').oninput = computeLabor;
-    $('#fSupplier').oninput = onSupplierInput;
+    $('#fSupplierSel').onchange = onSupplierSelChange;
+    $('#fSupplierNew').oninput = updateSupplierHint;
     // 雲端同步設定
     const cfg = Sync.getConfig();
     $('#fSyncUrl').value = cfg.url || '';
