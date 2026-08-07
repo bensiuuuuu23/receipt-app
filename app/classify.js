@@ -15,6 +15,9 @@ const CATEGORIES = [
 const CAT_MAP = Object.fromEntries(CATEGORIES.map((c) => [c.id, c]));
 function catOf(id) { return CAT_MAP[id] || CAT_MAP['other']; }
 
+/* 「人工」種類的員工名單（下拉選單用） */
+const EMPLOYEES = ['李定妹', '鄭小貞', '余詠詩', '張曉東', '吳嘉雯', '陳幸兒', '張鳳娟', '馮曉彤', '張美玲'];
+
 /* 內建供應商對應表：選了這些常用供應商就自動帶對應種類（仍可手動改） */
 const DEFAULT_SUPPLIER_MAP = {
   // 食材
