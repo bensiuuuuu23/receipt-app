@@ -170,18 +170,22 @@
     selectedCat = id;
     renderCatGrid();
     const labor = id === 'labor';
-    $('#laborBox').hidden = !labor;
-    $('#supplierBox').hidden = labor;
-    $('#amountRow').hidden = labor; // 人工的金額用時薪×工時自動算
-    // 選了種類才更新「這個種類的供應商」下拉（換種類就清空選擇）
-    if (!labor) { renderSupplierSelect(''); updateSupplierHint(); }
+    $('#employeeBox').hidden = !labor;   // 人工：選員工
+    $('#supplierBox').hidden = labor;    // 其他：選供應商
+    $('#amountRow').hidden = false;      // 都直接填金額
+    if (labor) renderEmployeeSelect();
+    else { renderSupplierSelect(''); updateSupplierHint(); }
   }
 
-  function computeLabor() {
-    const w = parseFloat($('#fWage').value) || 0;
-    const h = parseFloat($('#fHours').value) || 0;
-    $('#laborTotal').textContent = money(w * h);
-    return w * h;
+  // 員工下拉（人工用）
+  function renderEmployeeSelect(keepVal) {
+    const sel = $('#fEmployeeSel');
+    const cur = keepVal != null ? keepVal : sel.value;
+    let opts = '<option value="">— 選擇員工 —</option>';
+    if (cur && !EMPLOYEES.includes(cur)) opts += `<option value="${esc(cur)}">${esc(cur)}</option>`;
+    opts += EMPLOYEES.map((n) => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
+    sel.innerHTML = opts;
+    sel.value = cur && [...sel.options].some((o) => o.value === cur) ? cur : '';
   }
 
   // 某種類底下的供應商（內建 + 使用者記過的）
@@ -354,10 +358,7 @@
     $('#addTitle').textContent = r ? '編輯單據' : '新增單據';
     $('#btnDelete').hidden = !r;
 
-    $('#fAmount').value = r && r.categoryId !== 'labor' ? r.amount : '';
-    $('#fWage').value = r ? (r.wage ?? '') : '';
-    $('#fHours').value = r ? (r.hours ?? '') : '';
-    $('#fEmployee').value = r ? (r.employee ?? '') : '';
+    $('#fAmount').value = r ? r.amount : '';
     $('#fNote').value = r ? (r.note ?? '') : '';
     $('#fDate').value = r ? r.date : todayISO();
 
@@ -365,9 +366,9 @@
     if (r) manualCatOverride = true; // 編輯時不自動覆蓋既有分類
     renderCatGrid();
     setCat(selectedCat || 'food');
-    if (!r) { selectedCat = null; renderCatGrid(); $('#laborBox').hidden = true; $('#supplierBox').hidden = true; $('#amountRow').hidden = true; }
-    computeLabor();
+    if (!r) { selectedCat = null; renderCatGrid(); $('#employeeBox').hidden = true; $('#supplierBox').hidden = true; $('#amountRow').hidden = true; }
     setSupplierValue(r ? (r.supplier || '') : '');
+    renderEmployeeSelect(r ? (r.employee || '') : '');
 
     if (r && r.hasPhoto) {
       const p = await DB.get('photos', r.id);
@@ -382,17 +383,11 @@
     const labor = selectedCat === 'labor';
     if (!selectedCat) { alert('請先選種類'); return; }
 
-    let amount;
-    if (labor) {
-      amount = computeLabor();
-      if (amount <= 0) { alert('請輸入時薪和工作小時'); return; }
-    } else {
-      amount = Math.round((parseFloat($('#fAmount').value) || 0) * 100) / 100;
-      if (amount <= 0) { alert('請輸入金額'); return; }
-    }
+    const amount = Math.round((parseFloat($('#fAmount').value) || 0) * 100) / 100;
+    if (amount <= 0) { alert('請輸入金額'); return; }
 
     const supplier = labor ? '' : currentSupplier();
-    const employee = labor ? $('#fEmployee').value.trim() : '';
+    const employee = labor ? $('#fEmployeeSel').value : '';
     const existing = editingId ? receipts.find((x) => x.id === editingId) : null;
     // 照片旗標：有新照片=有；按過移除=無；沒動過=沿用原本（保住雲端下載回來的照片連結）
     const hasPhoto = pendingPhoto ? true : (photoChanged ? false : !!(existing && existing.hasPhoto));
@@ -403,8 +398,8 @@
       categoryId: selectedCat,
       supplier,
       employee,
-      wage: labor ? (parseFloat($('#fWage').value) || 0) : null,
-      hours: labor ? (parseFloat($('#fHours').value) || 0) : null,
+      wage: null,
+      hours: null,
       date: $('#fDate').value || todayISO(),
       note: $('#fNote').value.trim(),
       hasPhoto,
@@ -801,8 +796,6 @@
     };
     $('#btnSave').onclick = save;
     $('#btnDelete').onclick = del;
-    $('#fWage').oninput = computeLabor;
-    $('#fHours').oninput = computeLabor;
     $('#fSupplierSel').onchange = onSupplierSelChange;
     $('#fSupplierNew').oninput = updateSupplierHint;
     // 雲端同步設定

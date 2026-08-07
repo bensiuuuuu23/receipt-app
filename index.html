@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <title>餐廳記帳</title>
-<link rel="stylesheet" href="styles.css?v=13">
+<link rel="stylesheet" href="styles.css?v=14">
 </head>
 <body>
   <div id="app">
@@ -98,18 +98,10 @@
         <div class="muted sec-label">種類</div>
         <div class="cat-grid" id="catGrid"></div>
 
-        <!-- 人工專屬 -->
-        <div id="laborBox" hidden>
-          <div class="card labor-card">
-            <div class="labor-inputs">
-              <label>時薪<input id="fWage" class="mini-input" inputmode="decimal" placeholder="0"></label>
-              <span class="times">×</span>
-              <label>工作小時<input id="fHours" class="mini-input" inputmode="decimal" placeholder="0"></label>
-            </div>
-            <div class="labor-total"><span class="muted">= 工資（自動算）</span><b id="laborTotal">$0.00</b></div>
-          </div>
-          <div class="muted sec-label">員工名稱（記為備註）</div>
-          <input id="fEmployee" class="text-input" placeholder="例：阿強">
+        <!-- 人工專屬：選員工（金額照常直接填） -->
+        <div id="employeeBox" hidden>
+          <div class="muted sec-label">員工名稱</div>
+          <select id="fEmployeeSel" class="text-input"></select>
         </div>
 
         <!-- 供應商（只列所選種類的供應商，可打字新增） -->
@@ -168,10 +160,10 @@
 
   </div>
 
-  <script src="db.js?v=13"></script>
-  <script src="classify.js?v=13"></script>
-  <script src="ocr.js?v=13"></script>
-  <script src="sync.js?v=13"></script>
-  <script src="app.js?v=13"></script>
+  <script src="db.js?v=14"></script>
+  <script src="classify.js?v=14"></script>
+  <script src="ocr.js?v=14"></script>
+  <script src="sync.js?v=14"></script>
+  <script src="app.js?v=14"></script>
 </body>
 </html>
